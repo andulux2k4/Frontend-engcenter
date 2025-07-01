@@ -1,0 +1,219 @@
+.login-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  gap: 4rem;
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #fff 0%, #ffe0e0 50%, #ffc0c0 100%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo-content {
+  text-align: center;
+}
+
+.logo-content h1 {
+  margin-top: 1.5rem;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #b30000;
+}
+
+.logo-content p {
+  margin-top: 0.5rem;
+  font-size: 1.2rem;
+  color: #cc0000;
+}
+
+.school-logo {
+  width: 250px;
+  height: 250px;
+  object-fit: contain;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.login-box {
+  flex: 1;
+  background-color: white;
+  padding: 2.5rem;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(204, 0, 0, 0.2);
+  width: 100%;
+  max-width: 450px;
+  border: 2px solid #ffb3b3;
+}
+
+.login-box h2 {
+  color: #b30000;
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  font-weight: 600;
+  position: relative;
+}
+
+.login-box h2::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 3px;
+  background-color: #b30000;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  width: 100%;
+  display: flex;
+  grid-row: none;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 1rem;
+  background-color: #fff;
+  border: 2px solid #ffb3b3;
+  border-radius: 5px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #b30000;
+  box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.15);
+}
+
+.forgot-password {
+  text-align: right;
+  margin-bottom: 1.5rem;
+}
+
+.forgot-password a {
+  color: #b30000;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.signup-button {
+  width: 100%;
+  padding: 1rem;
+  background-color: #b30000;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.signup-button:hover {
+  background-color: #800000;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 1rem;
+  border-radius: 5px;
+  margin-bottom: 1rem;
+  text-align: center;
+  border: 1px solid #ffcdd2;
+}
+
+@media (max-width: 1024px) {
+  .login-container {
+    flex-direction: column;
+    padding: 2rem;
+    gap: 2rem;
+    min-height: auto;
+  }
+
+  .logo-section,
+  .login-box {
+    width: 100%;
+    max-width: 450px;
+  }
+
+  .school-logo {
+    width: 180px;
+    height: 180px;
+  }
+
+  .login-box {
+    padding: 2rem;
+  }
+
+  .logo-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .logo-content p {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 1rem;
+    min-height: auto;
+  }
+
+  .school-logo {
+    width: 150px;
+    height: 150px;
+  }
+
+  .login-box {
+    padding: 1.5rem;
+    width: 100%;
+  }
+} 
