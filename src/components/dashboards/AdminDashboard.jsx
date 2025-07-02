@@ -21,6 +21,7 @@ import {
   FiFileText,
   FiCheckCircle,
   FiPlus,
+  FiMenu,
 } from "react-icons/fi";
 import { BiMoney } from "react-icons/bi";
 import { HiAcademicCap } from "react-icons/hi";
@@ -30,6 +31,8 @@ import apiService from "../../services/api";
 
 function AdminDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAddUserForm, setShowAddUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState("all");
@@ -37,6 +40,11 @@ function AdminDashboard({ user, onLogout }) {
   const [showEditClass, setShowEditClass] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
   const [editClassData, setEditClassData] = useState(null);
+
+  // User detail modal states
+  const [showUserDetail, setShowUserDetail] = useState(false);
+  const [selectedUserDetail, setSelectedUserDetail] = useState(null);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
   // const [showAddStudent, setShowAddStudent] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -50,6 +58,7 @@ function AdminDashboard({ user, onLogout }) {
     classIds: [],
     studentIds: [],
     canViewTeacher: false,
+    wagePerLesson: 100000, // Thêm trường lương/buổi cho giáo viên
   });
   const [showNewClassModal, setShowNewClassModal] = useState(false);
   const [newClass, setNewClass] = useState({
@@ -583,10 +592,65 @@ function AdminDashboard({ user, onLogout }) {
       classIds: [],
       studentIds: [],
       canViewTeacher: false,
+      wagePerLesson: 100000, // Thêm trường lương/buổi cho giáo viên
     });
     setEditingUser(null);
     setError(""); // Clear any previous errors
     setShowAddUserForm(true);
+  };
+
+  // Handle viewing user details
+  const handleViewUserDetail = async (userSummary) => {
+    if (!user?.token) return;
+
+    console.log("🔍 Viewing user detail for user:", userSummary);
+    setShowUserDetail(true);
+    setUserDetailLoading(true);
+    setSelectedUserDetail(null);
+    setError("");
+
+    try {
+      // Gọi API để lấy thông tin chi tiết của user
+      const response = await apiService.getUserById(
+        user.token,
+        userSummary.id,
+        userSummary.role,
+        userSummary.roleId // Truyền roleId nếu có
+      );
+
+      if (response.success && response.data) {
+        console.log("✅ User detail loaded successfully:", response.data);
+        // Đảm bảo role được truyền đúng từ userSummary vào selectedUserDetail
+        const userDetailWithRole = {
+          ...response.data,
+          originalRole: userSummary.role, // Lưu role gốc từ userSummary
+          role: response.data.role || userSummary.role, // Ưu tiên role từ API, fallback về userSummary
+        };
+        setSelectedUserDetail(userDetailWithRole);
+      } else {
+        console.error("❌ Failed to load user details:", response);
+        setError(
+          response.message || "Không thể tải thông tin chi tiết người dùng"
+        );
+        // Fallback to summary data with role preserved
+        setSelectedUserDetail({
+          ...userSummary,
+          originalRole: userSummary.role,
+          role: userSummary.role,
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error loading user details:", error);
+      setError("Lỗi kết nối. Đang hiển thị thông tin cơ bản.");
+      // Fallback to summary data with role preserved
+      setSelectedUserDetail({
+        ...userSummary,
+        originalRole: userSummary.role,
+        role: userSummary.role,
+      });
+    } finally {
+      setUserDetailLoading(false);
+    }
   };
 
   // Fetch detailed user info for editing
@@ -608,50 +672,88 @@ function AdminDashboard({ user, onLogout }) {
 
       if (response.success && response.data) {
         // Cập nhật form data với thông tin chi tiết từ API
+        const userData = response.data;
+        
+        // Extract class IDs from various possible formats
+        let classIds = [];
+        if (userData.currentClasses && Array.isArray(userData.currentClasses)) {
+          classIds = userData.currentClasses.map(cls => {
+            return cls._id || cls.id || cls;
+          });
+        } else if (userData.classIds && Array.isArray(userData.classIds)) {
+          classIds = userData.classIds;
+        }
+        
+        // Extract student IDs for parent role
+        let studentIds = [];
+        if (userData.children && Array.isArray(userData.children)) {
+          studentIds = userData.children.map(child => {
+            return child._id || child.id || child.userId?._id || child.userId?.id || child;
+          });
+        } else if (userData.studentIds && Array.isArray(userData.studentIds)) {
+          studentIds = userData.studentIds;
+        }
+        
+        // Extract parent ID for student role
+        let parentId = "";
+        if (userData.parentId) {
+          parentId = userData.parentId._id || userData.parentId.id || userData.parentId;
+        }
+
         setFormData({
-          id: response.data.id || response.data._id || userSummary.id,
+          id: userData.id || userData._id || userSummary.id,
           name:
-            response.data.name ||
-            response.data.userId?.name ||
+            userData.name ||
+            userData.userId?.name ||
             userSummary.name ||
             "",
           email:
-            response.data.email ||
-            response.data.userId?.email ||
+            userData.email ||
+            userData.userId?.email ||
             userSummary.email ||
             "",
           phone:
-            response.data.phone ||
-            response.data.phoneNumber ||
-            response.data.userId?.phoneNumber ||
+            userData.phone ||
+            userData.phoneNumber ||
+            userData.userId?.phoneNumber ||
             userSummary.phone ||
             "",
           role:
-            (response.data.role || userSummary.role || "")
+            (userData.role || userSummary.role || "")
               .charAt(0)
               .toUpperCase() +
-            (response.data.role || userSummary.role || "")
+            (userData.role || userSummary.role || "")
               .slice(1)
               .toLowerCase(),
-          gender: response.data.gender || userSummary.gender || "",
-          address: response.data.address || userSummary.address || "",
+          gender: userData.gender || userSummary.gender || "",
+          address: userData.address || userSummary.address || "",
           passwordBeforeHash: "", // Không lấy password từ API
-          classIds:
-            response.data.classIds || response.data.currentClasses || [],
-          studentIds: response.data.studentIds || response.data.children || [],
-          parentId: response.data.parentId || "",
+          classIds: classIds,
+          studentIds: studentIds,
+          parentId: parentId,
           canViewTeacher:
-            response.data.canViewTeacher ||
-            response.data.canSeeTeacher ||
+            userData.canViewTeacher ||
+            userData.canSeeTeacher ||
             false,
+          wagePerLesson: userData.wagePerLesson || 100000, // Thêm lương/buổi từ API
         });
+        
         // Preserve roleId from userSummary in editingUser
         setEditingUser({
-          ...response.data,
+          ...userData,
           roleId: userSummary.roleId,
           id: userSummary.id,
+          name: userData.name || userData.userId?.name || userSummary.name,
         });
         setError(""); // Clear any previous errors
+        
+        console.log("📝 Form data loaded for editing:", {
+          name: userData.name || userData.userId?.name || userSummary.name,
+          role: userSummary.role,
+          classIds: classIds,
+          studentIds: studentIds,
+          parentId: parentId
+        });
       } else {
         // Fallback to summary data if API fails
         console.warn("API failed, using summary data:", response.message);
@@ -670,6 +772,7 @@ function AdminDashboard({ user, onLogout }) {
           studentIds: [],
           parentId: "",
           canViewTeacher: false,
+          wagePerLesson: 100000, // Thêm trường mặc định cho fallback
         });
         setEditingUser({
           ...userSummary,
@@ -771,8 +874,16 @@ function AdminDashboard({ user, onLogout }) {
           role: formData.role,
           gender: formData.gender,
           address: formData.address,
-          canViewTeacher: formData.canViewTeacher,
         };
+
+        // Thêm các trường theo role
+        if (formData.role === "Parent") {
+          updateData.canSeeTeacher = formData.canViewTeacher; // Sửa tên field cho backend
+        }
+
+        if (formData.role === "Teacher") {
+          updateData.wagePerLesson = formData.wagePerLesson; // Thêm lương/buổi cho giáo viên
+        }
 
         // Convert User IDs to Role IDs for relationships
         if (formData.classIds && formData.classIds.length > 0) {
@@ -847,6 +958,16 @@ function AdminDashboard({ user, onLogout }) {
         // Tạo user mới - cũng cần convert IDs
         const createData = { ...formData };
 
+        // Thêm các trường theo role cho user mới
+        if (createData.role === "Parent") {
+          createData.canSeeTeacher = createData.canViewTeacher; // Sửa tên field cho backend
+          delete createData.canViewTeacher; // Xóa field không cần thiết
+        }
+
+        if (createData.role === "Teacher") {
+          createData.wagePerLesson = createData.wagePerLesson || 100000; // Đảm bảo có lương mặc định
+        }
+
         // Convert User IDs to Role IDs for relationships
         if (createData.studentIds && createData.studentIds.length > 0) {
           const studentRoleIds = createData.studentIds.map((userId) => {
@@ -900,6 +1021,7 @@ function AdminDashboard({ user, onLogout }) {
           classIds: [],
           studentIds: [],
           canViewTeacher: false,
+          wagePerLesson: 100000, // Reset về giá trị mặc định
         });
         // Reload danh sách users
         loadUsers();
@@ -1240,20 +1362,20 @@ function AdminDashboard({ user, onLogout }) {
   // Handle role filter change
   const handleRoleFilterChange = async (newRole) => {
     console.log(`🔍 Changing filter from "${selectedRole}" to "${newRole}"`);
-    
+
     // Reset pagination first
-    const newPagination = { 
-      ...pagination, 
-      currentPage: 1 
+    const newPagination = {
+      ...pagination,
+      currentPage: 1,
     };
     setPagination(newPagination);
-    
+
     // Update role
     setSelectedRole(newRole);
-    
+
     // Clear any existing error
     setError("");
-    
+
     // Load users immediately with new filter and reset pagination
     if (user?.token) {
       setLoading(true);
@@ -1264,7 +1386,7 @@ function AdminDashboard({ user, onLogout }) {
         }
 
         console.log(`📋 Loading users with filter:`, filters, `page: 1`);
-        
+
         const response = await apiService.getUsers(
           user.token,
           1, // Always start from page 1
@@ -1278,7 +1400,11 @@ function AdminDashboard({ user, onLogout }) {
             roleId: user.roleId || user._id || user.id,
             name: user.name || user.userId?.name || "Chưa có tên",
             email: user.email || user.userId?.email || "Chưa có email",
-            phone: user.phoneNumber || user.phone || user.userId?.phoneNumber || "Chưa có",
+            phone:
+              user.phoneNumber ||
+              user.phone ||
+              user.userId?.phoneNumber ||
+              "Chưa có",
             role: (user.role || "unknown").toLowerCase(),
             status: user.isActive ? "Đang hoạt động" : "Tạm nghỉ",
             gender: user.gender || "",
@@ -1291,17 +1417,20 @@ function AdminDashboard({ user, onLogout }) {
           }));
 
           setUsers(mappedUsers);
-          
+
           if (response.pagination) {
             setPagination({
               currentPage: 1,
               totalPages: response.pagination.totalPages || 1,
-              totalUsers: response.pagination.totalItems || response.data.length,
+              totalUsers:
+                response.pagination.totalItems || response.data.length,
               limit: pagination.limit,
             });
           }
-          
-          console.log(`✅ Loaded ${mappedUsers.length} users for role: ${newRole}`);
+
+          console.log(
+            `✅ Loaded ${mappedUsers.length} users for role: ${newRole}`
+          );
         } else {
           setError(response.msg || "Không thể tải danh sách người dùng");
         }
@@ -1317,10 +1446,18 @@ function AdminDashboard({ user, onLogout }) {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>
-          <FiUser className="icon" />
-          Quản trị viên
-        </h1>
+        <div className="header-left">
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarVisible(!sidebarVisible)}
+          >
+            <FiMenu />
+          </button>
+          <h1>
+            <FiUser className="icon" />
+            Quản trị viên
+          </h1>
+        </div>
         <div className="user-info">
           <span>Xin chào, {user?.name}</span>
           <button onClick={onLogout} className="logout-btn">
@@ -1331,7 +1468,15 @@ function AdminDashboard({ user, onLogout }) {
       </header>
 
       <div className="dashboard-content">
-        <aside className="sidebar">
+        {/* Sidebar Overlay for mobile */}
+        {sidebarVisible && (
+          <div
+            className="sidebar-overlay"
+            onClick={() => setSidebarVisible(false)}
+          ></div>
+        )}
+
+        <aside className={`sidebar ${sidebarVisible ? "visible" : "hidden"}`}>
           <nav className="nav-menu">
             <button
               className={`nav-item ${activeTab === "overview" ? "active" : ""}`}
@@ -1964,159 +2109,407 @@ function AdminDashboard({ user, onLogout }) {
               )}
 
               {showAddUserForm && (
-                <div className="modal">
-                  <div className="modal-content">
-                    <h3>
-                      <FiEdit className="icon" />
-                      {editingUser
-                        ? `Chỉnh sửa User: ${editingUser.name || ""}`
-                        : "Thêm User mới"}
-                    </h3>
-                    {loading && editingUser ? (
-                      <div
-                        className="loading-message"
-                        style={{ padding: "3rem 0" }}
-                      >
-                        Đang tải thông tin...
-                      </div>
-                    ) : error ? (
-                      <div className="error-message">{error}</div>
-                    ) : (
-                      <form onSubmit={handleFormSubmit}>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiUser className="icon" />
-                            <input
-                              id="name"
-                              type="text"
-                              name="name"
-                              value={formData.name}
-                              onChange={handleInputChange}
-                              placeholder="Nhập họ và tên"
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiMail className="icon" />
-                            <input
-                              id="email"
-                              type="email"
-                              name="email"
-                              value={formData.email}
-                              onChange={handleInputChange}
-                              placeholder="Nhập địa chỉ email"
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiLock className="icon" />
-                            <input
-                              id="passwordBeforeHash"
-                              type="password"
-                              name="passwordBeforeHash"
-                              value={formData.passwordBeforeHash}
-                              onChange={handleInputChange}
-                              placeholder="••••••••"
-                              minLength="8"
-                              {...(editingUser ? {} : { required: true })}
-                            />
-                          </div>
-                          {editingUser && (
-                            <small
-                              style={{ color: "#6b7280", fontSize: "0.875rem" }}
-                            >
-                              Để trống nếu không muốn thay đổi mật khẩu
-                            </small>
-                          )}
-                        </div>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiPhone className="icon" />
-                            <input
-                              id="phone"
-                              type="tel"
-                              name="phone"
-                              value={formData.phone}
-                              onChange={handleInputChange}
-                              placeholder="Nhập số điện thoại"
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiUsers className="icon" />
-                            <select
-                              id="role"
-                              name="role"
-                              value={formData.role}
-                              onChange={handleInputChange}
-                              required
-                            >
-                              <option value="Student">Học viên</option>
-                              <option value="Teacher">Giáo viên</option>
-                              <option value="Parent">Phụ huynh</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiUser className="icon" />
-                            <select
-                              id="gender"
-                              name="gender"
-                              value={formData.gender}
-                              onChange={handleInputChange}
-                            >
-                              <option value="">Chọn giới tính</option>
-                              <option value="Nam">Nam</option>
-                              <option value="Nữ">Nữ</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="form-group">
-                          <div className="input-with-icon">
-                            <FiMapPin className="icon" />
-                            <input
-                              id="address"
-                              type="text"
-                              name="address"
-                              value={formData.address}
-                              onChange={handleInputChange}
-                              placeholder="Nhập địa chỉ"
-                            />
-                          </div>
-                        </div>
+                <div
+                  className="modal-overlay"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      setShowAddUserForm(false);
+                      setEditingUser(null);
+                      setError("");
+                    }
+                  }}
+                >
+                  <div className="user-edit-modal">
+                    {/* Header */}
+                    <div className="user-edit-header">
+                      <button
+                        className="user-edit-close"
+                        onClick={() => {
+                          setShowAddUserForm(false);
+                          setEditingUser(null);
+                          setError("");
+                        }}
+                      ></button>
 
-                        {/* Conditional Fields */}
-                        {formData.role === "Student" && (
-                          <>
-                            <div className="form-group">
-                              <div className="input-with-icon">
-                                <FiUser className="icon" />
-                                <select
-                                  id="parentId"
-                                  name="parentId"
-                                  value={formData.parentId}
-                                  onChange={handleInputChange}
+                      <div className="user-edit-avatar">
+                        {editingUser
+                          ? (formData.name || editingUser.name || "U").charAt(0).toUpperCase()
+                          : "+"}
+                      </div>
+                      <h2 className="user-edit-name">
+                        {editingUser
+                          ? `Chỉnh sửa: ${formData.name || editingUser.name || "Người dùng"}`
+                          : "Thêm người dùng mới"}
+                      </h2>
+                      <div className="user-edit-role">
+                        {(() => {
+                          const role = formData.role?.toLowerCase() || "";
+                          switch (role) {
+                            case "teacher":
+                              return "Giáo viên";
+                            case "student":
+                              return "Học viên";
+                            case "parent":
+                              return "Phụ huynh";
+                            case "admin":
+                              return "Quản trị viên";
+                            default:
+                              return role
+                                ? role.charAt(0).toUpperCase() + role.slice(1)
+                                : "Người dùng";
+                          }
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Body */}
+                    <div className="user-edit-body">
+                      {loading && editingUser ? (
+                        <div className="user-detail-loading">
+                          <div className="loading-spinner"></div>
+                          <div className="loading-text">
+                            Đang tải thông tin...
+                          </div>
+                        </div>
+                      ) : error ? (
+                        <div
+                          className="error-message"
+                          style={{
+                            color: "#dc2626",
+                            background: "#fee2e2",
+                            padding: "1rem",
+                            borderRadius: "8px",
+                            marginBottom: "1rem",
+                          }}
+                        >
+                          {error}
+                        </div>
+                      ) : (
+                        <form onSubmit={handleFormSubmit}>
+                          {/* Thông tin cơ bản */}
+                          <div className="user-edit-section">
+                            <h3>
+                              <FiUser />
+                              Thông tin cơ bản
+                            </h3>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">
+                                Họ và tên *
+                              </label>
+                              <input
+                                className="user-edit-input"
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleInputChange}
+                                placeholder="Nhập họ và tên"
+                                required
+                              />
+                            </div>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">Email *</label>
+                              <input
+                                className="user-edit-input"
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                placeholder="Nhập địa chỉ email"
+                                required
+                              />
+                            </div>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">
+                                Số điện thoại *
+                              </label>
+                              <input
+                                className="user-edit-input"
+                                type="tel"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleInputChange}
+                                placeholder="Nhập số điện thoại"
+                                required
+                              />
+                            </div>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">
+                                Giới tính
+                              </label>
+                              <select
+                                className="user-edit-select"
+                                name="gender"
+                                value={formData.gender}
+                                onChange={handleInputChange}
+                              >
+                                <option value="">Chọn giới tính</option>
+                                <option value="Nam">Nam</option>
+                                <option value="Nữ">Nữ</option>
+                              </select>
+                            </div>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">Địa chỉ</label>
+                              <input
+                                className="user-edit-input"
+                                type="text"
+                                name="address"
+                                value={formData.address}
+                                onChange={handleInputChange}
+                                placeholder="Nhập địa chỉ"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Thông tin hệ thống */}
+                          <div className="user-edit-section">
+                            <h3>
+                              <FiLock />
+                              Thông tin hệ thống
+                            </h3>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">
+                                Vai trò *
+                              </label>
+                              <select
+                                className="user-edit-select"
+                                name="role"
+                                value={formData.role}
+                                onChange={handleInputChange}
+                                required
+                                disabled={editingUser} // Không cho đổi role khi edit
+                              >
+                                <option value="Student">Học viên</option>
+                                <option value="Teacher">Giáo viên</option>
+                                <option value="Parent">Phụ huynh</option>
+                              </select>
+                              {editingUser && (
+                                <small
+                                  style={{
+                                    color: "#6b7280",
+                                    fontSize: "0.75rem",
+                                    marginTop: "0.25rem",
+                                    display: "block",
+                                  }}
                                 >
-                                  <option value="">Chọn phụ huynh</option>
-                                  {parents.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name} (ID: {p.id.slice(-6)})
-                                    </option>
-                                  ))}
+                                  Không thể thay đổi vai trò khi chỉnh sửa
+                                </small>
+                              )}
+                            </div>
+
+                            <div className="user-edit-field">
+                              <label className="user-edit-label">
+                                Mật khẩu {!editingUser && "*"}
+                              </label>
+                              <input
+                                className="user-edit-input"
+                                type="password"
+                                name="passwordBeforeHash"
+                                value={formData.passwordBeforeHash}
+                                onChange={handleInputChange}
+                                placeholder="••••••••••"
+                                minLength="8"
+                                {...(editingUser ? {} : { required: true })}
+                              />
+                              {editingUser && (
+                                <small
+                                  style={{
+                                    color: "#6b7280",
+                                    fontSize: "0.75rem",
+                                    marginTop: "0.25rem",
+                                    display: "block",
+                                  }}
+                                >
+                                  Để trống nếu không muốn thay đổi mật khẩu
+                                </small>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Thông tin theo role */}
+                          {formData.role === "Student" && (
+                            <div className="user-edit-section">
+                              <h3>
+                                <HiAcademicCap />
+                                Thông tin học viên
+                              </h3>
+
+                              <div className="user-edit-field">
+                                <label className="user-edit-label">
+                                  Phụ huynh hiện tại
+                                </label>
+                                
+                                {/* Hiển thị phụ huynh hiện tại nếu có */}
+                                {formData.parentId ? (
+                                  <div style={{ marginBottom: "0.5rem" }}>
+                                    {(() => {
+                                      const currentParent = parents.find(p => p.id === formData.parentId);
+                                      if (currentParent) {
+                                        return (
+                                          <span
+                                            style={{
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: "0.25rem",
+                                              padding: "0.25rem 0.5rem",
+                                              background: "#f3e8ff",
+                                              color: "#7c3aed",
+                                              borderRadius: "4px",
+                                              fontSize: "0.75rem",
+                                            }}
+                                          >
+                                            Phụ huynh: {currentParent.name}
+                                            <button
+                                              type="button"
+                                              onClick={() => setFormData(prev => ({...prev, parentId: ""}))}
+                                              style={{
+                                                background: "none",
+                                                border: "none",
+                                                color: "#7c3aed",
+                                                cursor: "pointer",
+                                                padding: "0",
+                                                marginLeft: "0.25rem",
+                                              }}
+                                            >
+                                              ×
+                                            </button>
+                                          </span>
+                                        );
+                                      } else {
+                                        return (
+                                          <span
+                                            style={{
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: "0.25rem",
+                                              padding: "0.25rem 0.5rem",
+                                              background: "#fef3c7",
+                                              color: "#92400e",
+                                              borderRadius: "4px",
+                                              fontSize: "0.75rem",
+                                            }}
+                                          >
+                                            Phụ huynh: ID {formData.parentId} (không tìm thấy)
+                                            <button
+                                              type="button"
+                                              onClick={() => setFormData(prev => ({...prev, parentId: ""}))}
+                                              style={{
+                                                background: "none",
+                                                border: "none",
+                                                color: "#92400e",
+                                                cursor: "pointer",
+                                                padding: "0",
+                                                marginLeft: "0.25rem",
+                                              }}
+                                            >
+                                              ×
+                                            </button>
+                                          </span>
+                                        );
+                                      }
+                                    })()}
+                                  </div>
+                                ) : (
+                                  <div style={{ 
+                                    padding: "0.5rem", 
+                                    background: "#f9fafb", 
+                                    borderRadius: "4px", 
+                                    fontSize: "0.75rem", 
+                                    color: "#6b7280",
+                                    marginBottom: "0.5rem"
+                                  }}>
+                                    Chưa có phụ huynh
+                                  </div>
+                                )}
+                                
+                                <select
+                                  className="user-edit-select"
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      setFormData(prev => ({...prev, parentId: e.target.value}));
+                                      e.target.value = ""; // Reset select
+                                    }
+                                  }}
+                                  value=""
+                                >
+                                  <option value="">Chọn phụ huynh để thay đổi</option>
+                                  {parents
+                                    .filter(p => p.id !== formData.parentId)
+                                    .map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} (ID: {p.id.slice(-6)})
+                                      </option>
+                                    ))}
                                 </select>
                               </div>
-                            </div>
-                            <div className="form-group">
-                              <div className="input-with-icon">
-                                <HiAcademicCap className="icon" />
+
+                              <div className="user-edit-field">
+                                <label className="user-edit-label">
+                                  Lớp học đang tham gia
+                                </label>
+                                
+                                {/* Hiển thị lớp học hiện tại nếu có */}
+                                {formData.classIds.length > 0 ? (
+                                  <div style={{ marginBottom: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                                    {formData.classIds.map((id) => {
+                                      const classItem = allClasses.find(
+                                        (c) => c.id === id || c._id === id
+                                      );
+                                      return (
+                                        <span
+                                          key={id}
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "0.25rem 0.5rem",
+                                            background: classItem ? "#e0f2fe" : "#fef3c7",
+                                            color: classItem ? "#0c4a6e" : "#92400e",
+                                            borderRadius: "4px",
+                                            fontSize: "0.75rem",
+                                          }}
+                                        >
+                                          {classItem ? classItem.className || classItem.name : `Lớp ID: ${id} (không tìm thấy)`}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveClass(id)
+                                            }
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: classItem ? "#0c4a6e" : "#92400e",
+                                              cursor: "pointer",
+                                              padding: "0",
+                                              marginLeft: "0.25rem",
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div style={{ 
+                                    padding: "0.5rem", 
+                                    background: "#f9fafb", 
+                                    borderRadius: "4px", 
+                                    fontSize: "0.75rem", 
+                                    color: "#6b7280",
+                                    marginBottom: "0.5rem"
+                                  }}>
+                                    Chưa tham gia lớp học nào
+                                  </div>
+                                )}
+                                
                                 <select
+                                  className="user-edit-select"
                                   onChange={(e) =>
                                     handleClassSelect(e.target.value)
                                   }
@@ -2134,39 +2527,242 @@ function AdminDashboard({ user, onLogout }) {
                                     ))}
                                 </select>
                               </div>
-                            </div>
-                            <div className="form-group">
-                              <div className="multi-select-container">
-                                {formData.classIds.map((id) => {
-                                  const classItem = allClasses.find(
-                                    (c) => c.id === id
-                                  );
-                                  return classItem ? (
-                                    <div
-                                      key={id}
-                                      className="selected-item-badge"
-                                    >
-                                      <span>{classItem.className}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveClass(id)}
-                                      >
-                                        &times;
-                                      </button>
-                                    </div>
-                                  ) : null;
-                                })}
+
+                                {formData.classIds.length > 0 && (
+                                  <div
+                                    style={{
+                                      marginTop: "0.5rem",
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      gap: "0.5rem",
+                                    }}
+                                  >
+                                    {formData.classIds.map((id) => {
+                                      const classItem = allClasses.find(
+                                        (c) => c.id === id || c._id === id
+                                      );
+                                      return (
+                                        <span
+                                          key={id}
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "0.25rem 0.5rem",
+                                            background: classItem ? "#e0f2fe" : "#fef3c7",
+                                            color: classItem ? "#0c4a6e" : "#92400e",
+                                            borderRadius: "4px",
+                                            fontSize: "0.75rem",
+                                          }}
+                                        >
+                                          {classItem ? classItem.className || classItem.name : `Lớp ID: ${id} (không tìm thấy)`}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveClass(id)
+                                            }
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: classItem ? "#0c4a6e" : "#92400e",
+                                              cursor: "pointer",
+                                              padding: "0",
+                                              marginLeft: "0.25rem",
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </>
-                        )}
+                          )}
 
-                        {formData.role === "Parent" && (
-                          <>
-                            <div className="form-group">
-                              <div className="input-with-icon">
-                                <FiUsers className="icon" />
+                          {formData.role === "Teacher" && (
+                            <div className="user-edit-section">
+                              <h3>
+                                <HiAcademicCap />
+                                Thông tin giáo viên
+                              </h3>
+
+                              <div className="user-edit-field">
+                                <label className="user-edit-label">
+                                  Lương mỗi buổi học (VND) *
+                                </label>
+                                <div className="input-with-icon">
+                                  <BiMoney className="user-edit-icon" />
+                                  <input
+                                    className="user-edit-input"
+                                    type="number"
+                                    name="wagePerLesson"
+                                    value={formData.wagePerLesson}
+                                    onChange={handleInputChange}
+                                    placeholder="Ví dụ: 100000"
+                                    min="0"
+                                    step="1000"
+                                    required
+                                  />
+                                </div>
+                                <small
+                                  style={{
+                                    color: "#6b7280",
+                                    fontSize: "0.75rem",
+                                    marginTop: "0.25rem",
+                                    display: "block",
+                                  }}
+                                >
+                                  Lương được tính theo từng buổi dạy thực tế
+                                </small>
+                              </div>
+
+                              <div className="user-edit-field">
+                                <label className="user-edit-label">
+                                  Lớp đang giảng dạy
+                                </label>
                                 <select
+                                  className="user-edit-select"
+                                  onChange={(e) =>
+                                    handleClassSelect(e.target.value)
+                                  }
+                                  value=""
+                                >
+                                  <option value="">Chọn lớp dạy để thêm</option>
+                                  {allClasses
+                                    .filter(
+                                      (c) => !formData.classIds.includes(c.id)
+                                    )
+                                    .map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.className}
+                                      </option>
+                                    ))}
+                                </select>
+
+                                {formData.classIds.length > 0 && (
+                                  <div
+                                    style={{
+                                      marginTop: "0.5rem",
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      gap: "0.5rem",
+                                    }}
+                                  >
+                                    {formData.classIds.map((id) => {
+                                      const classItem = allClasses.find(
+                                        (c) => c.id === id || c._id === id
+                                      );
+                                      return (
+                                        <span
+                                          key={id}
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "0.25rem 0.5rem",
+                                            background: classItem ? "#fef3c7" : "#fee2e2",
+                                            color: classItem ? "#92400e" : "#dc2626",
+                                            borderRadius: "4px",
+                                            fontSize: "0.75rem",
+                                          }}
+                                        >
+                                          {classItem ? classItem.className || classItem.name : `Lớp ID: ${id} (không tìm thấy)`}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveClass(id)
+                                            }
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: classItem ? "#92400e" : "#dc2626",
+                                              cursor: "pointer",
+                                              padding: "0",
+                                              marginLeft: "0.25rem",
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {formData.role === "Parent" && (
+                            <div className="user-edit-section">
+                              <h3>
+                                <FiUsers />
+                                Thông tin phụ huynh
+                              </h3>
+
+                              <div className="user-edit-field">
+                                <label className="user-edit-label">
+                                  Con em đang theo học
+                                </label>
+                                
+                                {/* Hiển thị con em hiện tại nếu có */}
+                                {formData.studentIds.length > 0 ? (
+                                  <div style={{ marginBottom: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                                    {formData.studentIds.map((id) => {
+                                      const student = students.find(
+                                        (s) => s.id === id || s._id === id
+                                      );
+                                      return (
+                                        <span
+                                          key={id}
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "0.25rem 0.5rem",
+                                            background: student ? "#dcfce7" : "#fef3c7",
+                                            color: student ? "#166534" : "#92400e",
+                                            borderRadius: "4px",
+                                            fontSize: "0.75rem",
+                                          }}
+                                        >
+                                          {student ? student.name : `Học viên ID: ${id} (không tìm thấy)`}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveStudentFromParent(id)
+                                            }
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: student ? "#166534" : "#92400e",
+                                              cursor: "pointer",
+                                              padding: "0",
+                                              marginLeft: "0.25rem",
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div style={{ 
+                                    padding: "0.5rem", 
+                                    background: "#f9fafb", 
+                                    borderRadius: "4px", 
+                                    fontSize: "0.75rem", 
+                                    color: "#6b7280",
+                                    marginBottom: "0.5rem"
+                                  }}>
+                                    Chưa có con em theo học
+                                  </div>
+                                )}
+                                
+                                <select
+                                  className="user-edit-select"
                                   onChange={(e) =>
                                     handleStudentSelect(e.target.value)
                                   }
@@ -2186,164 +2782,60 @@ function AdminDashboard({ user, onLogout }) {
                                     ))}
                                 </select>
                               </div>
-                            </div>
-                            <div className="form-group">
-                              <div className="multi-select-container">
-                                {formData.studentIds.map((id) => {
-                                  const student = students.find(
-                                    (s) => s.id === id
-                                  );
-                                  return student ? (
-                                    <div
-                                      key={id}
-                                      className="selected-item-badge"
-                                    >
-                                      <span>{student.name}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRemoveStudentFromParent(id)
-                                        }
-                                      >
-                                        &times;
-                                      </button>
-                                    </div>
-                                  ) : null;
-                                })}
-                              </div>
-                            </div>
-                            <div className="form-group">
-                              <label
-                                style={{
-                                  marginBottom: 0,
-                                  marginRight: "1.5rem",
-                                }}
-                              >
-                                Quyền xem giáo viên:
-                              </label>
-                              <div className="radio-group radio-group-horizontal">
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="canViewTeacher"
-                                    value="true"
-                                    checked={formData.canViewTeacher === true}
-                                    onChange={handleInputChange}
-                                  />
-                                  Có
-                                </label>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="canViewTeacher"
-                                    value="false"
-                                    checked={formData.canViewTeacher === false}
-                                    onChange={handleInputChange}
-                                  />
-                                  Không
-                                </label>
-                              </div>
-                            </div>
-                          </>
-                        )}
 
-                        {formData.role === "Teacher" && (
-                          <>
-                            <div className="form-group">
-                              <div className="input-with-icon">
-                                <HiAcademicCap className="icon" />
-                                <select
-                                  onChange={(e) =>
-                                    handleClassSelect(e.target.value)
-                                  }
-                                  value=""
-                                >
-                                  <option value="">Chọn lớp dạy để thêm</option>
-                                  {allClasses
-                                    .filter(
-                                      (c) => !formData.classIds.includes(c.id)
-                                    )
-                                    .map((c) => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.className}
-                                      </option>
-                                    ))}
-                                </select>
+                              <div className="user-edit-field">
+                                <label className="user-edit-label">
+                                  Quyền xem thông tin giáo viên
+                                </label>
+                                <div className="user-edit-checkbox-group">
+                                  <input
+                                    className="user-edit-checkbox"
+                                    type="checkbox"
+                                    name="canViewTeacher"
+                                    checked={formData.canViewTeacher}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        canViewTeacher: e.target.checked,
+                                      }))
+                                    }
+                                  />
+                                  <label className="user-edit-checkbox-label">
+                                    Cho phép xem thông tin giáo viên
+                                  </label>
+                                </div>
                               </div>
                             </div>
-                            <div className="form-group">
-                              <div className="multi-select-container">
-                                {formData.classIds.map((id) => {
-                                  const classItem = allClasses.find(
-                                    (c) => c.id === id
-                                  );
-                                  return classItem ? (
-                                    <div
-                                      key={id}
-                                      className="selected-item-badge"
-                                    >
-                                      <span>{classItem.className}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveClass(id)}
-                                      >
-                                        &times;
-                                      </button>
-                                    </div>
-                                  ) : null;
-                                })}
-                              </div>
-                            </div>
-                          </>
-                        )}
+                          )}
+                        </form>
+                      )}
+                    </div>
 
-                        <div
-                          className="form-actions"
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            gap: "0.75rem",
+                    {/* Actions */}
+                    {!loading && !error && (
+                      <div className="user-edit-actions">
+                        <button
+                          type="button"
+                          className="user-edit-btn user-edit-btn-cancel"
+                          onClick={() => {
+                            setShowAddUserForm(false);
+                            setEditingUser(null);
+                            setError("");
                           }}
                         >
-                          <button
-                            type="submit"
-                            className="btn btn-primary"
-                            style={{
-                              minWidth: "130px",
-                              display: "inline-flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              gap: "0.4rem",
-                              padding: "0.5rem 1rem",
-                            }}
-                          >
-                            <FiSave
-                              style={{ fontSize: "1rem", flexShrink: 0 }}
-                            />
-                            <span>{editingUser ? "Cập nhật" : "Thêm mới"}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => {
-                              setShowAddUserForm(false);
-                              setEditingUser(null);
-                            }}
-                            style={{
-                              width: "130px",
-                              display: "inline-flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              gap: "0.4rem",
-                            }}
-                          >
-                            <FiX style={{ fontSize: "1rem", flexShrink: 0 }} />
-                            <span style={{ flex: 1, textAlign: "center" }}>
-                              Hủy Bỏ
-                            </span>
-                          </button>
-                        </div>
-                      </form>
+                          <FiX />
+                          Hủy bỏ
+                        </button>
+                        <button
+                          type="button"
+                          className="user-edit-btn user-edit-btn-save"
+                          onClick={handleFormSubmit}
+                          disabled={loading}
+                        >
+                          <FiSave />
+                          {editingUser ? "Cập nhật" : "Thêm mới"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2468,12 +2960,21 @@ function AdminDashboard({ user, onLogout }) {
                         filteredUsers.map((user, index) => (
                           <tr
                             key={user.id}
+                            onClick={() => handleViewUserDetail(user)}
                             style={{
                               backgroundColor:
                                 index % 2 === 0 ? "white" : "#f9fafb",
                               borderBottom: "1px solid #f3f4f6",
                               transition: "background-color 0.2s ease",
                               minHeight: "80px",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = "#f3f4f6";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                index % 2 === 0 ? "white" : "#f9fafb";
                             }}
                           >
                             <td
@@ -2692,7 +3193,10 @@ function AdminDashboard({ user, onLogout }) {
                               >
                                 <button
                                   className="btn btn-secondary"
-                                  onClick={() => handleEditUser(user)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditUser(user);
+                                  }}
                                   disabled={loading}
                                   style={{
                                     padding: "0.625rem 0.875rem",
@@ -2716,7 +3220,10 @@ function AdminDashboard({ user, onLogout }) {
                                 </button>
                                 <button
                                   className="btn btn-danger"
-                                  onClick={() => handleDeleteUser(user.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteUser(user.id);
+                                  }}
                                   disabled={loading}
                                   style={{
                                     padding: "0.625rem 0.875rem",
@@ -4584,6 +5091,339 @@ function AdminDashboard({ user, onLogout }) {
                 Hủy
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Detail Modal */}
+      {showUserDetail && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowUserDetail(false);
+              setSelectedUserDetail(null);
+              setError("");
+            }
+          }}
+        >
+          <div className="user-detail-modal">
+            {/* Header */}
+            <div className="user-detail-header">
+              <button
+                className="user-detail-close"
+                onClick={() => {
+                  setShowUserDetail(false);
+                  setSelectedUserDetail(null);
+                  setError("");
+                }}
+              ></button>
+
+              {userDetailLoading ? (
+                <div className="user-detail-loading">
+                  <div className="loading-spinner"></div>
+                  <div className="loading-text">Đang tải thông tin...</div>
+                </div>
+              ) : selectedUserDetail ? (
+                <>
+                  <div className="user-detail-avatar">
+                    {(
+                      selectedUserDetail.name ||
+                      selectedUserDetail.userId?.name ||
+                      "U"
+                    )
+                      .charAt(0)
+                      .toUpperCase()}
+                  </div>
+                  <h2 className="user-detail-name">
+                    {selectedUserDetail.name ||
+                      selectedUserDetail.userId?.name ||
+                      "Chưa có tên"}
+                  </h2>
+                  <div className="user-detail-role">
+                    {(() => {
+                      // Lấy role từ nhiều nguồn có thể
+                      const userRole =
+                        selectedUserDetail.role ||
+                        selectedUserDetail.userId?.role ||
+                        selectedUserDetail.originalRole ||
+                        "";
+
+                      const normalizedRole = userRole.toLowerCase();
+
+                      switch (normalizedRole) {
+                        case "teacher":
+                          return "Giáo viên";
+                        case "student":
+                          return "Học viên";
+                        case "parent":
+                          return "Phụ huynh";
+                        case "admin":
+                          return "Quản trị viên";
+                        default:
+                          return userRole
+                            ? userRole.charAt(0).toUpperCase() +
+                                userRole.slice(1)
+                            : "Chưa xác định";
+                      }
+                    })()}
+                  </div>
+                </>
+              ) : (
+                <div className="user-detail-loading">
+                  <div className="loading-text">Không thể tải thông tin</div>
+                </div>
+              )}
+            </div>
+
+            {/* Body */}
+            {!userDetailLoading && selectedUserDetail && (
+              <div className="user-detail-body">
+                {/* Basic Information */}
+                <div className="user-detail-section">
+                  <h3 className="section-title">
+                    <FiUser className="icon" />
+                    Thông tin cơ bản
+                  </h3>
+
+                  <div className="info-row">
+                    <span className="info-label">Email:</span>
+                    <span className="info-value">
+                      {selectedUserDetail.email ||
+                        selectedUserDetail.userId?.email ||
+                        "Chưa có email"}
+                    </span>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Số điện thoại:</span>
+                    <span className="info-value">
+                      {selectedUserDetail.phone ||
+                        selectedUserDetail.phoneNumber ||
+                        selectedUserDetail.userId?.phoneNumber ||
+                        "Chưa có"}
+                    </span>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Giới tính:</span>
+                    <span className="info-value">
+                      {selectedUserDetail.gender ||
+                        selectedUserDetail.userId?.gender ||
+                        "Chưa có"}
+                    </span>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Địa chỉ:</span>
+                    <span className="info-value">
+                      {selectedUserDetail.address ||
+                        selectedUserDetail.userId?.address ||
+                        "Chưa có"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Role Specific Information */}
+                {(selectedUserDetail.role?.toLowerCase() === "student" ||
+                  selectedUserDetail.userId?.role === "student") && (
+                  <div className="user-detail-section">
+                    <h3 className="section-title">
+                      <HiAcademicCap className="icon" />
+                      Thông tin học viên
+                    </h3>
+
+                    <div className="info-row">
+                      <span className="info-label">Lớp học hiện tại:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.currentClasses?.length || 0} lớp
+                      </span>
+                    </div>
+
+                    <div className="info-row">
+                      <span className="info-label">Phụ huynh:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.parentId?.name ||
+                          selectedUserDetail.parentId?.userId?.name ||
+                          "Chưa có"}
+                      </span>
+                    </div>
+
+                    {selectedUserDetail.parentId?.userId?.email && (
+                      <div className="info-row">
+                        <span className="info-label">Email phụ huynh:</span>
+                        <span className="info-value">
+                          {selectedUserDetail.parentId.userId.email}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedUserDetail.parentId?.userId?.phoneNumber && (
+                      <div className="info-row">
+                        <span className="info-label">SĐT phụ huynh:</span>
+                        <span className="info-value">
+                          {selectedUserDetail.parentId.userId.phoneNumber}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(selectedUserDetail.role?.toLowerCase() === "teacher" ||
+                  selectedUserDetail.userId?.role === "teacher") && (
+                  <div className="user-detail-section">
+                    <h3 className="section-title">
+                      <FiBook className="icon" />
+                      Thông tin giáo viên
+                    </h3>
+
+                    <div className="info-row">
+                      <span className="info-label">Lương mỗi buổi:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.wagePerLesson
+                          ? `${new Intl.NumberFormat("vi-VN").format(
+                              selectedUserDetail.wagePerLesson
+                            )} VND`
+                          : "Chưa thiết lập"}
+                      </span>
+                    </div>
+
+                    <div className="info-row">
+                      <span className="info-label">Số lớp đang dạy:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.currentClasses?.length || 0} lớp
+                      </span>
+                    </div>
+
+                    <div className="info-row">
+                      <span className="info-label">Trạng thái:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.isDeleted
+                          ? "Ngừng hoạt động"
+                          : "Đang hoạt động"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {(selectedUserDetail.role?.toLowerCase() === "parent" ||
+                  selectedUserDetail.userId?.role === "parent") && (
+                  <div className="user-detail-section">
+                    <h3 className="section-title">
+                      <FiUsers className="icon" />
+                      Thông tin phụ huynh
+                    </h3>
+
+                    <div className="info-row">
+                      <span className="info-label">Số con:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.childId?.length ||
+                          selectedUserDetail.studentIds?.length ||
+                          selectedUserDetail.children?.length ||
+                          0}{" "}
+                        học viên
+                      </span>
+                    </div>
+
+                    <div className="info-row">
+                      <span className="info-label">Xem thông tin GV:</span>
+                      <span className="info-value">
+                        {selectedUserDetail.canSeeTeacher ? "Có" : "Không"}
+                      </span>
+                    </div>
+
+                    {(selectedUserDetail.childId?.length > 0 ||
+                      selectedUserDetail.studentIds?.length > 0) && (
+                      <div className="children-list">
+                        <h4
+                          style={{
+                            margin: "1rem 0 0.5rem 0",
+                            fontSize: "0.9rem",
+                            color: "#4a5568",
+                          }}
+                        >
+                          Danh sách con:
+                        </h4>
+                        {(
+                          selectedUserDetail.childId ||
+                          selectedUserDetail.studentIds ||
+                          []
+                        ).map((child, index) => (
+                          <div key={child._id || index} className="child-item">
+                            <div className="child-name">
+                              {child.userId?.name ||
+                                child.name ||
+                                `Học viên ${index + 1}`}
+                            </div>
+                            <div className="child-details">
+                              Email:{" "}
+                              {child.userId?.email || child.email || "Chưa có"}{" "}
+                              | Giới tính:{" "}
+                              {child.userId?.gender ||
+                                child.gender ||
+                                "Chưa có"}{" "}
+                              | Số lớp: {child.classId?.length || 0}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* System Information */}
+                <div className="user-detail-section">
+                  <h3 className="section-title">
+                    <FiBarChart2 className="icon" />
+                    Thông tin hệ thống
+                  </h3>
+
+                  <div className="info-row">
+                    <span className="info-label">ID người dùng:</span>
+                    <span
+                      className="info-value"
+                      style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
+                    >
+                      {selectedUserDetail._id || selectedUserDetail.id || "N/A"}
+                    </span>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Ngày tạo:</span>
+                    <span className="info-value">
+                      {selectedUserDetail.createdAt ||
+                      selectedUserDetail.userId?.createdAt
+                        ? new Date(
+                            selectedUserDetail.createdAt ||
+                              selectedUserDetail.userId.createdAt
+                          ).toLocaleDateString("vi-VN", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        : "N/A"}
+                    </span>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Cập nhật lần cuối:</span>
+                    <span className="info-value">
+                      {selectedUserDetail.updatedAt ||
+                      selectedUserDetail.userId?.updatedAt
+                        ? new Date(
+                            selectedUserDetail.updatedAt ||
+                              selectedUserDetail.userId.updatedAt
+                          ).toLocaleDateString("vi-VN", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        : "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
