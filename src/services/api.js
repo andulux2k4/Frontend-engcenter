@@ -490,6 +490,7 @@ class ApiService {
     const endpoint = `/v1/api/classes/available-students${
       queryParams.toString() ? `?${queryParams}` : ""
     }`;
+
     return await this.apiCall(endpoint, {
       method: "GET",
       headers: {

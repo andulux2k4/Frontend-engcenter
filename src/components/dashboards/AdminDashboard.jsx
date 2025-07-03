@@ -10,6 +10,10 @@ import apiService from "../../services/api";
 import Overview from "./components/Overview";
 import UserManagement from "./components/UserManagement";
 import ClassManagement from "./components/ClassManagement";
+import TuitionManagement from "./components/TuitionManagement";
+import SalaryManagement from "./components/SalaryManagement";
+import NotificationsManagement from "./components/NotificationsManagement";
+import AdvertisementsManagement from "./components/AdvertisementsManagement";
 import TeacherSelectionModal from "./components/modals/TeacherSelectionModal";
 import StudentSelectionModal from "./components/modals/StudentSelectionModal";
 import UserDetailModal from "./components/modals/UserDetailModal";
@@ -18,6 +22,8 @@ import UserFormModal from "./components/modals/UserFormModal";
 import ClassDetailModal from "./components/modals/ClassDetailModal";
 
 function AdminDashboard({ user, onLogout }) {
+  console.log("🏢 AdminDashboard rendered with user:", user);
+
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1392,6 +1398,8 @@ function AdminDashboard({ user, onLogout }) {
               id: student._id || student.id,
               name: student.name || student.userId?.name,
               email: student.email || student.userId?.email,
+              phoneNumber: student.phoneNumber || student.userId?.phoneNumber,
+              phone: student.phone || student.userId?.phone,
               discount: student.discount,
               idObj: studentIdObj, // Store the full object for user details view
             };
@@ -1808,6 +1816,21 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       // Prepare data for API
+      // Convert day names to numbers (0 = Monday, 1 = Tuesday, etc.)
+      const dayToNumberMap = {
+        Monday: 0,
+        Tuesday: 1,
+        Wednesday: 2,
+        Thursday: 3,
+        Friday: 4,
+        Saturday: 5,
+        Sunday: 6,
+      };
+
+      const daysAsNumbers = newClass.daysOfLessonInWeek.map(
+        (day) => dayToNumberMap[day]
+      );
+
       const classData = {
         className: newClass.name,
         year: parseInt(newClass.year),
@@ -1817,7 +1840,7 @@ function AdminDashboard({ user, onLogout }) {
         schedule: {
           startDate: newClass.startDate,
           endDate: newClass.endDate,
-          daysOfLessonInWeek: newClass.daysOfLessonInWeek,
+          daysOfLessonInWeek: daysAsNumbers,
         },
         isAvailable: true,
       };
@@ -1915,7 +1938,7 @@ function AdminDashboard({ user, onLogout }) {
               onClick={() => setActiveTab("payments")}
             >
               <BiMoney className="icon" />
-              Thanh toán
+              Lương giáo viên
             </button>
             <button
               className={`nav-item ${activeTab === "tuition" ? "active" : ""}`}
@@ -1946,8 +1969,12 @@ function AdminDashboard({ user, onLogout }) {
           </nav>
         </aside>
 
-        <main className="main-content">
-          {activeTab === "overview" && <Overview stats={mockData.stats} />}
+        <main
+          className={`main-content ${
+            activeTab === "overview" ? "overview-layout" : ""
+          }`}
+        >
+          {activeTab === "overview" && <Overview user={user} />}
 
           {activeTab === "users" && (
             <UserManagement
@@ -2016,32 +2043,25 @@ function AdminDashboard({ user, onLogout }) {
             />
           )}
 
-          {activeTab === "payments" && (
-            <div className="section-placeholder">
-              <h2>Thanh toán</h2>
-              <p>Tính năng này đang được phát triển.</p>
-            </div>
-          )}
+          {activeTab === "payments" && <SalaryManagement user={user} />}
 
           {activeTab === "tuition" && (
-            <div className="section-placeholder">
-              <h2>Học phí</h2>
-              <p>Tính năng này đang được phát triển.</p>
-            </div>
+            <TuitionManagement
+              user={user}
+              loading={loading}
+              error={error}
+              setError={setError}
+            />
           )}
 
+          {activeTab === "payments" && <SalaryManagement user={user} />}
+
           {activeTab === "notifications" && (
-            <div className="section-placeholder">
-              <h2>Thông báo</h2>
-              <p>Tính năng này đang được phát triển.</p>
-            </div>
+            <NotificationsManagement user={user} />
           )}
 
           {activeTab === "advertisements" && (
-            <div className="section-placeholder">
-              <h2>Quảng cáo</h2>
-              <p>Tính năng này đang được phát triển.</p>
-            </div>
+            <AdvertisementsManagement user={user} />
           )}
         </main>
       </div>
@@ -2087,6 +2107,7 @@ function AdminDashboard({ user, onLogout }) {
         setSelectedClass={setSelectedClass}
         setError={setError}
         handleViewUserDetail={handleViewUserDetail}
+        user={user}
       />
 
       {/* Class Form Modal - for editing classes */}

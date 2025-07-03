@@ -1,20 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FiBook,
   FiCalendar,
   FiUsers,
   FiDollarSign,
   FiClock,
-  FiChevronDown,
-  FiChevronUp,
   FiMail,
   FiPhone,
   FiBarChart2,
   FiCheckCircle,
   FiHome,
   FiInfo,
+  FiEye,
+  FiX,
 } from "react-icons/fi";
 import { HiAcademicCap } from "react-icons/hi";
+import apiService from "../../../../services/api";
 
 function ClassDetailModal({
   showClassDetail,
@@ -23,41 +24,46 @@ function ClassDetailModal({
   setSelectedClass,
   setError,
   handleViewUserDetail,
+  user,
 }) {
-  const [showTeacherDetails, setShowTeacherDetails] = useState(false);
-  const [showStudentList, setShowStudentList] = useState(false);
+  const [showStudentListModal, setShowStudentListModal] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  if (!showClassDetail) {
-    return null;
-  }
+  useEffect(() => {
+    if (selectedClass && selectedClass.studentList) {
+      setStudents(selectedClass.studentList);
+    }
+  }, [selectedClass]);
 
-  // Function to format date strings
+  useEffect(() => {
+    if (searchTerm) {
+      setFilteredStudents(
+        students.filter((student) =>
+          student.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
+    } else {
+      setFilteredStudents(students);
+    }
+  }, [searchTerm, students]);
+
+  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return "Chưa xác định";
-
     try {
-      return new Date(dateString).toLocaleDateString("vi-VN");
+      const date = new Date(dateString);
+      return date.toLocaleDateString("vi-VN");
     } catch (error) {
-      return dateString || "Chưa xác định";
+      return "Chưa xác định";
     }
   };
 
-  // Function to convert day numbers to day names
+  // Get weekday label in Vietnamese
   const getWeekdayLabel = (day) => {
-    if (typeof day === "number") {
-      // If day is a number (0-6), convert to day name
-      const days = [
-        "Chủ nhật",
-        "Thứ 2",
-        "Thứ 3",
-        "Thứ 4",
-        "Thứ 5",
-        "Thứ 6",
-        "Thứ 7",
-      ];
-      return days[day % 7];
-    } else if (typeof day === "string") {
-      // If day is a string (Monday, Tuesday, etc.), convert to Vietnamese
+    if (typeof day === "string" || typeof day === "number") {
       const dayLabels = {
         Monday: "Thứ 2",
         Tuesday: "Thứ 3",
@@ -66,13 +72,13 @@ function ClassDetailModal({
         Friday: "Thứ 6",
         Saturday: "Thứ 7",
         Sunday: "Chủ nhật",
-        0: "Chủ nhật",
-        1: "Thứ 2",
-        2: "Thứ 3",
-        3: "Thứ 4",
-        4: "Thứ 5",
-        5: "Thứ 6",
-        6: "Thứ 7",
+        0: "Thứ 2",
+        1: "Thứ 3",
+        2: "Thứ 4",
+        3: "Thứ 5",
+        4: "Thứ 6",
+        5: "Thứ 7",
+        6: "Chủ nhật",
       };
       return dayLabels[day] || day;
     }
@@ -93,575 +99,432 @@ function ClassDetailModal({
     }
   };
 
+  if (!showClassDetail) {
+    return null;
+  }
+
   return (
-    <div
-      className="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          setShowClassDetail(false);
-          setSelectedClass(null);
-          setError("");
-        }
-      }}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 50,
-      }}
-    >
+    <>
       <div
-        className="class-detail-modal"
+        className="modal-overlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowClassDetail(false);
+            setSelectedClass(null);
+            setError("");
+          }
+        }}
         style={{
-          backgroundColor: "white",
-          borderRadius: "0.5rem",
-          width: "90%",
-          maxWidth: "800px",
-          maxHeight: "90vh",
-          overflow: "auto",
-          boxShadow:
-            "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 50,
         }}
       >
-        {/* Header */}
         <div
-          className="class-detail-header"
+          className="class-detail-modal"
           style={{
-            padding: "1.5rem",
-            borderBottom: "1px solid #e5e7eb",
-            position: "relative",
-            textAlign: "center",
-            backgroundColor: "#3b82f6",
-            color: "white",
-            borderRadius: "0.5rem 0.5rem 0 0",
+            backgroundColor: "white",
+            borderRadius: "0.5rem",
+            width: "90%",
+            maxWidth: "900px",
+            maxHeight: "90vh",
+            overflow: "auto",
+            boxShadow:
+              "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
           }}
         >
-          <button
-            className="class-detail-close"
-            onClick={() => {
-              setShowClassDetail(false);
-              setSelectedClass(null);
-              setError("");
-            }}
-            style={{
-              position: "absolute",
-              top: "1rem",
-              right: "1rem",
-              backgroundColor: "transparent",
-              border: "none",
-              color: "white",
-              fontSize: "1.5rem",
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
-
-          {!selectedClass ? (
-            <div
-              className="class-detail-loading"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "2rem",
-              }}
-            >
-              <div
-                className="loading-spinner"
-                style={{
-                  border: "4px solid rgba(255, 255, 255, 0.3)",
-                  borderRadius: "50%",
-                  borderTop: "4px solid white",
-                  width: "40px",
-                  height: "40px",
-                  animation: "spin 1s linear infinite",
-                }}
-              ></div>
-              <div className="loading-text" style={{ marginTop: "1rem" }}>
-                Đang tải thông tin...
-              </div>
-            </div>
-          ) : (
-            <>
-              <div
-                className="class-detail-icon"
-                style={{
-                  backgroundColor: "#2563eb",
-                  width: "60px",
-                  height: "60px",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 1rem",
-                  fontSize: "1.75rem",
-                }}
-              >
-                <FiBook />
-              </div>
-              <h2
-                className="class-detail-name"
-                style={{
-                  fontSize: "1.5rem",
-                  fontWeight: "600",
-                  margin: "0 0 0.5rem",
-                }}
-              >
-                {selectedClass.className || "Chưa có tên lớp"}
-              </h2>
-              <div
-                className="class-detail-meta"
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: "1rem",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <HiAcademicCap /> Lớp {selectedClass.grade}
-                </span>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <FiCalendar /> Năm học: {selectedClass.year}
-                </span>
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "0.25rem 0.75rem",
-                    borderRadius: "9999px",
-                    fontWeight: "500",
-                    fontSize: "0.75rem",
-                    backgroundColor: selectedClass.isAvailable
-                      ? "#dcfce7"
-                      : "#fee2e2",
-                    color: selectedClass.isAvailable ? "#166534" : "#991b1b",
-                  }}
-                >
-                  {selectedClass.status}
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Body */}
-        {selectedClass && (
+          {/* Header */}
           <div
-            className="class-detail-body"
+            className="class-detail-header"
             style={{
-              padding: "1.5rem",
+              padding: "2rem",
+              borderBottom: "1px solid #e5e7eb",
+              position: "relative",
+              backgroundColor: "#3b82f6",
+              color: "white",
+              borderRadius: "0.5rem 0.5rem 0 0",
             }}
           >
-            {/* Thông tin cơ bản */}
-            <div
-              className="class-detail-section"
+            <button
+              className="class-detail-close"
+              onClick={() => {
+                setShowClassDetail(false);
+                setSelectedClass(null);
+                setError("");
+              }}
               style={{
-                marginBottom: "2rem",
+                position: "absolute",
+                top: "1rem",
+                right: "1rem",
+                backgroundColor: "transparent",
+                border: "none",
+                color: "white",
+                fontSize: "1.5rem",
+                cursor: "pointer",
               }}
             >
-              <h3
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "600",
-                  marginBottom: "1rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  color: "#1f2937",
-                }}
-              >
-                <FiBook style={{ color: "#3b82f6" }} />
-                Thông tin cơ bản
-              </h3>
+              <FiX />
+            </button>
 
+            {!selectedClass ? (
               <div
+                className="class-detail-loading"
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                  gap: "1rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "2rem",
                 }}
               >
-                {/* Giáo viên */}
                 <div
-                  className="info-card"
+                  className="loading-spinner"
                   style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    border: "4px solid rgba(255, 255, 255, 0.3)",
+                    borderRadius: "50%",
+                    borderTop: "4px solid white",
+                    width: "40px",
+                    height: "40px",
+                    animation: "spin 1s linear infinite",
                   }}
-                >
-                  <div
-                    className="info-label"
-                    style={{
-                      fontWeight: "500",
-                      color: "#6b7280",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Giáo viên
-                  </div>
-                  <div
-                    className="info-value teacher-section"
-                    style={{
-                      fontWeight: "500",
-                      color: "#111827",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: selectedClass.teacherId ? "pointer" : "default",
-                      }}
-                      onClick={() => {
-                        if (handleViewUserDetail) {
-                          handleTeacherClick();
-                        } else {
-                          setShowTeacherDetails(!showTeacherDetails);
-                        }
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                        }}
-                      >
-                        <FiUsers style={{ color: "#3b82f6" }} />
-                        {selectedClass.teacherName || "Chưa phân công"}
-                      </span>
-                      {selectedClass.teacherId && (
-                        <button
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "#6b7280",
-                            cursor: "pointer",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowTeacherDetails(!showTeacherDetails);
-                          }}
-                        >
-                          {showTeacherDetails ? (
-                            <FiChevronUp />
-                          ) : (
-                            <FiChevronDown />
-                          )}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Thông tin chi tiết giáo viên */}
-                    {showTeacherDetails && selectedClass.teacherId && (
-                      <div
-                        style={{
-                          marginTop: "0.5rem",
-                          padding: "0.5rem",
-                          backgroundColor: "#f3f4f6",
-                          borderRadius: "0.375rem",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {selectedClass.teacherEmail && (
-                          <div
-                            style={{
-                              marginBottom: "0.25rem",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                            }}
-                          >
-                            <FiMail style={{ color: "#6b7280" }} />
-                            <span>{selectedClass.teacherEmail}</span>
-                          </div>
-                        )}
-                        {selectedClass.teacherPhone && (
-                          <div
-                            style={{
-                              marginBottom: "0.25rem",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                            }}
-                          >
-                            <FiPhone style={{ color: "#6b7280" }} />
-                            <span>{selectedClass.teacherPhone}</span>
-                          </div>
-                        )}
-                        <div
-                          style={{ marginTop: "0.5rem", textAlign: "center" }}
-                        >
-                          <button
-                            style={{
-                              backgroundColor: "#eff6ff",
-                              color: "#2563eb",
-                              border: "none",
-                              padding: "0.25rem 0.5rem",
-                              borderRadius: "0.25rem",
-                              fontSize: "0.75rem",
-                              cursor: "pointer",
-                            }}
-                            onClick={handleTeacherClick}
-                          >
-                            Xem chi tiết giáo viên
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                ></div>
+                <div className="loading-text" style={{ marginTop: "1rem" }}>
+                  Đang tải thông tin...
                 </div>
-
-                {/* Học sinh */}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center" }}>
                 <div
-                  className="info-card"
+                  className="class-detail-icon"
                   style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    backgroundColor: "#2563eb",
+                    width: "80px",
+                    height: "80px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 1rem",
+                    fontSize: "2rem",
                   }}
                 >
-                  <div
-                    className="info-label"
-                    style={{
-                      fontWeight: "500",
-                      color: "#6b7280",
-                      marginBottom: "0.5rem",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span>Học sinh</span>
-                    {selectedClass.studentList &&
-                      selectedClass.studentList.length > 0 && (
-                        <button
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "#6b7280",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                          onClick={() => setShowStudentList(!showStudentList)}
-                        >
-                          {showStudentList ? (
-                            <FiChevronUp />
-                          ) : (
-                            <FiChevronDown />
-                          )}
-                        </button>
-                      )}
-                  </div>
-                  <div
-                    className="info-value"
-                    style={{
-                      fontWeight: "500",
-                      color: "#111827",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      <FiUsers style={{ color: "#3b82f6" }} />
-                      {selectedClass.currentStudents}/
-                      {selectedClass.maxStudents || 20} học sinh
-                    </div>
-
-                    {/* Danh sách học sinh */}
-                    {showStudentList &&
-                      selectedClass.studentList &&
-                      selectedClass.studentList.length > 0 && (
-                        <div
-                          style={{
-                            marginTop: "0.75rem",
-                            backgroundColor: "#f3f4f6",
-                            borderRadius: "0.375rem",
-                            padding: "0.5rem",
-                            maxHeight: "200px",
-                            overflowY: "auto",
-                          }}
-                        >
-                          <ul
-                            style={{ listStyle: "none", padding: 0, margin: 0 }}
-                          >
-                            {selectedClass.studentList.map((student, index) => (
-                              <li
-                                key={student.id || index}
-                                style={{
-                                  padding: "0.5rem",
-                                  borderBottom:
-                                    index < selectedClass.studentList.length - 1
-                                      ? "1px solid #e5e7eb"
-                                      : "none",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  fontSize: "0.875rem",
-                                }}
-                                onClick={() =>
-                                  handleStudentClick(
-                                    student.idObj || {
-                                      id: student.id || student._id,
-                                      role: "student",
-                                      roleId: student.id || student._id,
-                                    }
-                                  )
-                                }
-                              >
-                                <span>
-                                  {student.name ||
-                                    student.userId?.name ||
-                                    `Học sinh ${index + 1}`}
-                                </span>
-                                {student.discount !== undefined && (
-                                  <span
-                                    style={{
-                                      fontSize: "0.75rem",
-                                      backgroundColor: "#fef3c7",
-                                      color: "#92400e",
-                                      padding: "0.125rem 0.375rem",
-                                      borderRadius: "9999px",
-                                    }}
-                                  >
-                                    Giảm {student.discount}%
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                  </div>
+                  <FiBook />
                 </div>
-
-                {/* Học phí */}
-                <div
-                  className="info-card"
+                <h2
+                  className="class-detail-name"
                   style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    fontSize: "1.75rem",
+                    fontWeight: "700",
+                    margin: "0 0 0.5rem",
                   }}
                 >
-                  <div
-                    className="info-label"
+                  {selectedClass.className || "Chưa có tên lớp"}
+                </h2>
+                <div
+                  className="class-detail-meta"
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: "1.5rem",
+                    flexWrap: "wrap",
+                    fontSize: "1rem",
+                  }}
+                >
+                  <span
                     style={{
-                      fontWeight: "500",
-                      color: "#6b7280",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Học phí mỗi buổi
-                  </div>
-                  <div
-                    className="info-value"
-                    style={{
-                      fontWeight: "500",
-                      color: "#111827",
                       display: "flex",
                       alignItems: "center",
                       gap: "0.5rem",
                     }}
                   >
-                    <FiDollarSign style={{ color: "#3b82f6" }} />
-                    {new Intl.NumberFormat("vi-VN", {
-                      style: "currency",
-                      currency: "VND",
-                    }).format(selectedClass.feePerLesson)}
-                  </div>
+                    <HiAcademicCap /> Lớp {selectedClass.grade}
+                  </span>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <FiCalendar /> Năm học: {selectedClass.year}
+                  </span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "0.375rem 1rem",
+                      borderRadius: "9999px",
+                      fontWeight: "600",
+                      fontSize: "0.875rem",
+                      backgroundColor: selectedClass.isAvailable
+                        ? "#dcfce7"
+                        : "#fee2e2",
+                      color: selectedClass.isAvailable ? "#166534" : "#991b1b",
+                    }}
+                  >
+                    {selectedClass.status}
+                  </span>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Lịch học */}
+          {/* Body */}
+          {selectedClass && (
             <div
-              className="class-detail-section"
+              className="class-detail-body"
               style={{
-                marginBottom: "2rem",
+                padding: "2rem",
               }}
             >
-              <h3
+              {/* Teacher Information */}
+              <div
+                className="teacher-section"
                 style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "600",
-                  marginBottom: "1rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  color: "#1f2937",
+                  marginBottom: "2rem",
+                  padding: "1.5rem",
+                  backgroundColor: "#f8fafc",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #e2e8f0",
                 }}
               >
-                <FiCalendar style={{ color: "#3b82f6" }} />
-                Lịch học
-              </h3>
+                <h3
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: "600",
+                    marginBottom: "1rem",
+                    color: "#1e293b",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <FiUsers style={{ color: "#3b82f6" }} />
+                  Thông tin giáo viên
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "1.125rem",
+                        fontWeight: "600",
+                        margin: "0 0 0.5rem 0",
+                        color: "#1e293b",
+                      }}
+                    >
+                      {selectedClass.teacherName || "Chưa phân công giáo viên"}
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "1rem",
+                        fontSize: "0.875rem",
+                        color: "#64748b",
+                      }}
+                    >
+                      {selectedClass.teacherEmail && (
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                          }}
+                        >
+                          <FiMail />
+                          {selectedClass.teacherEmail}
+                        </span>
+                      )}
+                      {selectedClass.teacherPhone && (
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                          }}
+                        >
+                          <FiPhone />
+                          {selectedClass.teacherPhone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {selectedClass.teacherId && (
+                    <button
+                      onClick={handleTeacherClick}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.75rem 1rem",
+                        backgroundColor: "#3b82f6",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                        fontWeight: "500",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.target.style.backgroundColor = "#2563eb";
+                      }}
+                      onMouseOut={(e) => {
+                        e.target.style.backgroundColor = "#3b82f6";
+                      }}
+                    >
+                      <FiEye />
+                      Xem chi tiết
+                    </button>
+                  )}
+                </div>
+              </div>
 
+              {/* Schedule and Fee Grid */}
               <div
-                className="schedule-info"
+                className="schedule-fee-grid"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                  gap: "1rem",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                  gap: "1.5rem",
+                  marginBottom: "2rem",
                 }}
               >
-                {/* Ngày học */}
+                {/* Start Date */}
                 <div
                   className="info-card"
                   style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    padding: "1.5rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "#fefefe",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
                   }}
                 >
                   <div
-                    className="info-label"
                     style={{
-                      fontWeight: "500",
-                      color: "#6b7280",
-                      marginBottom: "0.5rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      marginBottom: "1rem",
                     }}
                   >
-                    Ngày học trong tuần
+                    <FiClock
+                      style={{ color: "#10b981", fontSize: "1.25rem" }}
+                    />
+                    <h4
+                      style={{
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                        color: "#1e293b",
+                        margin: 0,
+                      }}
+                    >
+                      Ngày bắt đầu
+                    </h4>
                   </div>
-                  <div
-                    className="info-value"
+                  <p
                     style={{
-                      fontWeight: "500",
-                      color: "#111827",
+                      fontSize: "1.125rem",
+                      fontWeight: "600",
+                      color: "#1e293b",
+                      margin: 0,
                     }}
                   >
+                    {formatDate(selectedClass.startDate)}
+                  </p>
+                </div>
+
+                {/* End Date */}
+                <div
+                  className="info-card"
+                  style={{
+                    padding: "1.5rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "#fefefe",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <FiClock
+                      style={{ color: "#ef4444", fontSize: "1.25rem" }}
+                    />
+                    <h4
+                      style={{
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                        color: "#1e293b",
+                        margin: 0,
+                      }}
+                    >
+                      Ngày kết thúc
+                    </h4>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: "1.125rem",
+                      fontWeight: "600",
+                      color: "#1e293b",
+                      margin: 0,
+                    }}
+                  >
+                    {formatDate(selectedClass.endDate)}
+                  </p>
+                </div>
+
+                {/* Days of Week */}
+                <div
+                  className="info-card"
+                  style={{
+                    padding: "1.5rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "#fefefe",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <FiCalendar
+                      style={{ color: "#3b82f6", fontSize: "1.25rem" }}
+                    />
+                    <h4
+                      style={{
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                        color: "#1e293b",
+                        margin: 0,
+                      }}
+                    >
+                      Ngày học trong tuần
+                    </h4>
+                  </div>
+                  <div>
                     {selectedClass.daysOfLessonInWeek &&
                     Array.isArray(selectedClass.daysOfLessonInWeek) &&
                     selectedClass.daysOfLessonInWeek.length > 0 ? (
@@ -676,12 +539,13 @@ function ClassDetailModal({
                           <span
                             key={index}
                             style={{
-                              padding: "0.25rem 0.75rem",
+                              padding: "0.375rem 0.75rem",
                               backgroundColor: "#eff6ff",
                               color: "#2563eb",
                               borderRadius: "9999px",
-                              fontSize: "0.75rem",
+                              fontSize: "0.875rem",
                               fontWeight: "500",
+                              border: "1px solid #dbeafe",
                             }}
                           >
                             {getWeekdayLabel(day)}
@@ -689,349 +553,701 @@ function ClassDetailModal({
                         ))}
                       </div>
                     ) : (
-                      <span style={{ color: "#6b7280" }}>Chưa có lịch học</span>
+                      <span style={{ color: "#64748b", fontSize: "0.875rem" }}>
+                        Chưa có lịch học
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* Thời gian học */}
-                {selectedClass.schedule && (
+                {/* Fee */}
+                <div
+                  className="info-card"
+                  style={{
+                    padding: "1.5rem",
+                    borderRadius: "0.75rem",
+                    backgroundColor: "#fefefe",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+                  }}
+                >
                   <div
-                    className="info-card"
                     style={{
-                      padding: "1rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <FiDollarSign
+                      style={{ color: "#f59e0b", fontSize: "1.25rem" }}
+                    />
+                    <h4
+                      style={{
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                        color: "#1e293b",
+                        margin: 0,
+                      }}
+                    >
+                      Học phí mỗi buổi
+                    </h4>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: "1.125rem",
+                      fontWeight: "600",
+                      color: "#1e293b",
+                      margin: 0,
+                    }}
+                  >
+                    {new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(selectedClass.feePerLesson)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Student Information */}
+              <div
+                className="student-section"
+                style={{
+                  marginBottom: "2rem",
+                  padding: "1.5rem",
+                  backgroundColor: "#f8fafc",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: "600",
+                    marginBottom: "1rem",
+                    color: "#1e293b",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <FiUsers style={{ color: "#3b82f6" }} />
+                  Thông tin học sinh
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "1.125rem",
+                        fontWeight: "600",
+                        margin: "0 0 0.5rem 0",
+                        color: "#1e293b",
+                      }}
+                    >
+                      Tổng số học sinh: {selectedClass.currentStudents || 0}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowStudentListModal(true)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      padding: "0.75rem 1rem",
+                      backgroundColor: "#10b981",
+                      color: "white",
+                      border: "none",
                       borderRadius: "0.5rem",
-                      backgroundColor: "#f9fafb",
-                      border: "1px solid #e5e7eb",
+                      fontSize: "0.875rem",
+                      fontWeight: "500",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.backgroundColor = "#059669";
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.backgroundColor = "#10b981";
+                    }}
+                  >
+                    <FiEye />
+                    Xem danh sách
+                  </button>
+                </div>
+              </div>
+
+              {/* Attendance Statistics */}
+              {selectedClass.attendanceStats && (
+                <div
+                  className="attendance-section"
+                  style={{
+                    marginBottom: "2rem",
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: "1.25rem",
+                      fontWeight: "600",
+                      marginBottom: "1.5rem",
+                      color: "#1e293b",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <FiBarChart2 style={{ color: "#3b82f6" }} />
+                    Thống kê điểm danh
+                  </h3>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(200px, 1fr))",
+                      gap: "1.5rem",
                     }}
                   >
                     <div
-                      className="info-label"
                       style={{
-                        fontWeight: "500",
-                        color: "#6b7280",
-                        marginBottom: "0.5rem",
+                        backgroundColor: "#f0fdf4",
+                        padding: "1.5rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid #dcfce7",
+                        textAlign: "center",
                       }}
                     >
-                      Thời gian học
-                    </div>
-                    <div
-                      className="info-value"
-                      style={{
-                        fontWeight: "500",
-                        color: "#111827",
-                      }}
-                    >
-                      {selectedClass.schedule.startTime &&
-                      selectedClass.schedule.endTime ? (
-                        <div
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <FiCheckCircle
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
+                            fontSize: "2rem",
+                            color: "#16a34a",
                           }}
-                        >
-                          <FiClock style={{ color: "#3b82f6" }} />
-                          {selectedClass.schedule.startTime} -{" "}
-                          {selectedClass.schedule.endTime}
-                        </div>
-                      ) : (
-                        <span style={{ color: "#6b7280" }}>
-                          Chưa có giờ học
-                        </span>
-                      )}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "2rem",
+                          fontWeight: "700",
+                          color: "#16a34a",
+                          marginBottom: "0.5rem",
+                        }}
+                      >
+                        {selectedClass.attendanceStats.attended || 0}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.875rem",
+                          color: "#166534",
+                          fontWeight: "500",
+                        }}
+                      >
+                        Buổi đã học
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        padding: "1.5rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid #e2e8f0",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <FiCalendar
+                          style={{
+                            fontSize: "2rem",
+                            color: "#64748b",
+                          }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "2rem",
+                          fontWeight: "700",
+                          color: "#64748b",
+                          marginBottom: "0.5rem",
+                        }}
+                      >
+                        {selectedClass.attendanceStats.total || 0}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.875rem",
+                          color: "#475569",
+                          fontWeight: "500",
+                        }}
+                      >
+                        Tổng số buổi
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Ngày bắt đầu */}
+              {/* Location Information */}
+              {selectedClass.location && (
                 <div
-                  className="info-card"
+                  className="location-section"
                   style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    marginBottom: "2rem",
+                    padding: "1.5rem",
+                    backgroundColor: "#f8fafc",
+                    borderRadius: "0.75rem",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
-                  <div
-                    className="info-label"
+                  <h3
                     style={{
-                      fontWeight: "500",
-                      color: "#6b7280",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Thời gian bắt đầu
-                  </div>
-                  <div
-                    className="info-value"
-                    style={{
-                      fontWeight: "500",
-                      color: "#111827",
+                      fontSize: "1.25rem",
+                      fontWeight: "600",
+                      marginBottom: "1rem",
+                      color: "#1e293b",
                       display: "flex",
                       alignItems: "center",
                       gap: "0.5rem",
                     }}
                   >
-                    <FiClock style={{ color: "#3b82f6" }} />
-                    {formatDate(selectedClass.startDate)}
-                  </div>
+                    <FiHome style={{ color: "#3b82f6" }} />
+                    Địa điểm học
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "1.125rem",
+                      color: "#1e293b",
+                      margin: 0,
+                    }}
+                  >
+                    {selectedClass.location}
+                  </p>
                 </div>
+              )}
 
-                {/* Ngày kết thúc */}
-                <div
-                  className="info-card"
+              {/* Footer action buttons */}
+              <div
+                className="class-detail-footer"
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "1rem",
+                  marginTop: "2rem",
+                  paddingTop: "1.5rem",
+                  borderTop: "1px solid #e5e7eb",
+                }}
+              >
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowClassDetail(false);
+                    setSelectedClass(null);
+                  }}
                   style={{
-                    padding: "1rem",
+                    padding: "0.75rem 2rem",
+                    backgroundColor: "#f3f4f6",
+                    color: "#374151",
+                    border: "1px solid #d1d5db",
                     borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    fontSize: "0.875rem",
+                    fontWeight: "500",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  <div
-                    className="info-label"
-                    style={{
-                      fontWeight: "500",
-                      color: "#6b7280",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Thời gian kết thúc
-                  </div>
-                  <div
-                    className="info-value"
-                    style={{
-                      fontWeight: "500",
-                      color: "#111827",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <FiClock style={{ color: "#3b82f6" }} />
-                    {formatDate(selectedClass.endDate)}
-                  </div>
-                </div>
+                  Đóng
+                </button>
               </div>
             </div>
+          )}
+        </div>
+      </div>
 
-            {/* Thống kê điểm danh (nếu có) */}
-            {selectedClass.attendanceStats && (
-              <div
-                className="class-detail-section"
-                style={{
-                  marginBottom: "2rem",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "1.25rem",
-                    fontWeight: "600",
-                    marginBottom: "1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    color: "#1f2937",
-                  }}
-                >
-                  <FiBarChart2 style={{ color: "#3b82f6" }} />
-                  Thống kê điểm danh
-                </h3>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(200px, 1fr))",
-                    gap: "1rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      backgroundColor: "#f0fdf4",
-                      padding: "1rem",
-                      borderRadius: "0.5rem",
-                      border: "1px solid #dcfce7",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "0.875rem",
-                        color: "#166534",
-                        marginBottom: "0.5rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      <FiCheckCircle />
-                      Đã học
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "1.5rem",
-                        fontWeight: "600",
-                        color: "#166534",
-                      }}
-                    >
-                      {selectedClass.attendanceStats.attended || 0} buổi
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      backgroundColor: "#fef2f2",
-                      padding: "1rem",
-                      borderRadius: "0.5rem",
-                      border: "1px solid #fee2e2",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "0.875rem",
-                        color: "#991b1b",
-                        marginBottom: "0.5rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      <FiInfo />
-                      Vắng mặt
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "1.5rem",
-                        fontWeight: "600",
-                        color: "#991b1b",
-                      }}
-                    >
-                      {selectedClass.attendanceStats.missed || 0} buổi
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      backgroundColor: "#f9fafb",
-                      padding: "1rem",
-                      borderRadius: "0.5rem",
-                      border: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "0.875rem",
-                        color: "#4b5563",
-                        marginBottom: "0.5rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      <FiCalendar />
-                      Tổng số buổi
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "1.5rem",
-                        fontWeight: "600",
-                        color: "#4b5563",
-                      }}
-                    >
-                      {selectedClass.attendanceStats.total || 0} buổi
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Thông tin địa điểm (nếu có) */}
-            {selectedClass.location && (
-              <div
-                className="class-detail-section"
-                style={{
-                  marginBottom: "2rem",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "1.25rem",
-                    fontWeight: "600",
-                    marginBottom: "1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    color: "#1f2937",
-                  }}
-                >
-                  <FiHome style={{ color: "#3b82f6" }} />
-                  Địa điểm học
-                </h3>
-
-                <div
-                  className="info-card"
-                  style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
-                  }}
-                >
-                  <div
-                    className="info-value"
-                    style={{
-                      fontWeight: "500",
-                      color: "#111827",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <FiMapPin style={{ color: "#3b82f6" }} />
-                    {selectedClass.location}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Footer action buttons */}
+      {/* Student List Modal */}
+      {showStudentListModal && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowStudentListModal(false);
+            }
+          }}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              backgroundColor: "white",
+              borderRadius: "0.75rem",
+              overflow: "hidden",
+              width: "90%",
+              maxWidth: "800px",
+              maxHeight: "80vh",
+              boxShadow:
+                "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            }}
+          >
             <div
-              className="class-detail-footer"
               style={{
+                backgroundColor: "#3b82f6",
+                color: "white",
+                padding: "1rem",
+                borderBottom: "1px solid #2563eb",
                 display: "flex",
-                justifyContent: "flex-end",
-                gap: "1rem",
-                marginTop: "2rem",
-                paddingTop: "1rem",
-                borderTop: "1px solid #e5e7eb",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowClassDetail(false);
-                  setSelectedClass(null);
-                }}
+              <h3
                 style={{
-                  padding: "0.75rem 1.5rem",
-                  backgroundColor: "#f3f4f6",
-                  color: "#374151",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
+                  fontSize: "1.25rem",
+                  fontWeight: "600",
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  color: "white",
                 }}
               >
-                Đóng
+                <FiUsers />
+                Danh sách học sinh
+              </h3>
+              <button
+                onClick={() => setShowStudentListModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "white",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
+                  padding: "0",
+                  lineHeight: "1",
+                }}
+                title="Đóng"
+              >
+                <FiX />
               </button>
             </div>
+
+            <div style={{ padding: "1rem" }}>
+              {/* Search bar */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm học sinh..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #d1d5db",
+                    backgroundColor: "#f9fafb",
+                    fontSize: "0.875rem",
+                  }}
+                />
+              </div>
+
+              {/* Student count */}
+              <div
+                style={{
+                  marginBottom: "1rem",
+                  padding: "0.75rem",
+                  backgroundColor: "#f0f9ff",
+                  borderRadius: "0.5rem",
+                  border: "1px solid #bae6fd",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#0c4a6e",
+                    fontSize: "0.875rem",
+                    fontWeight: "500",
+                  }}
+                >
+                  Tổng số học sinh: {filteredStudents.length} /{" "}
+                  {students.length}
+                </p>
+              </div>
+
+              {/* Students table */}
+              <div
+                style={{
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                {filteredStudents && filteredStudents.length > 0 ? (
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                    }}
+                  >
+                    <thead
+                      style={{
+                        backgroundColor: "#f9fafb",
+                        position: "sticky",
+                        top: 0,
+                      }}
+                    >
+                      <tr>
+                        <th
+                          style={{
+                            padding: "0.75rem",
+                            textAlign: "left",
+                            fontWeight: "600",
+                            fontSize: "0.875rem",
+                            borderBottom: "2px solid #e5e7eb",
+                          }}
+                        >
+                          Tên học sinh
+                        </th>
+                        <th
+                          style={{
+                            padding: "0.75rem",
+                            textAlign: "left",
+                            fontWeight: "600",
+                            fontSize: "0.875rem",
+                            borderBottom: "2px solid #e5e7eb",
+                          }}
+                        >
+                          Email
+                        </th>
+                        <th
+                          style={{
+                            padding: "0.75rem",
+                            textAlign: "left",
+                            fontWeight: "600",
+                            fontSize: "0.875rem",
+                            borderBottom: "2px solid #e5e7eb",
+                          }}
+                        >
+                          Số điện thoại
+                        </th>
+                        <th
+                          style={{
+                            padding: "0.75rem",
+                            textAlign: "center",
+                            fontWeight: "600",
+                            fontSize: "0.875rem",
+                            borderBottom: "2px solid #e5e7eb",
+                          }}
+                        >
+                          Thao tác
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((student, index) => {
+                        const studentId =
+                          student.id ||
+                          student._id ||
+                          (student.userId &&
+                            (student.userId.id || student.userId._id));
+                        const studentData = student.userId || student;
+
+                        return (
+                          <tr
+                            key={studentId || index}
+                            style={{
+                              borderBottom: "1px solid #e5e7eb",
+                              backgroundColor:
+                                index % 2 === 0 ? "#ffffff" : "#f9fafb",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "0.75rem",
+                                fontSize: "0.875rem",
+                                cursor: "pointer",
+                              }}
+                              onClick={() =>
+                                handleStudentClick(
+                                  student.idObj || {
+                                    id: student.id || student._id,
+                                    role: "student",
+                                    roleId: student.id || student._id,
+                                  }
+                                )
+                              }
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.5rem",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontWeight: "500",
+                                    color: "#1e293b",
+                                  }}
+                                >
+                                  {studentData.name ||
+                                    student.name ||
+                                    `Học sinh ${index + 1}`}
+                                </span>
+                                {student.discount > 0 && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      backgroundColor: "#fef3c7",
+                                      color: "#92400e",
+                                      padding: "0.125rem 0.375rem",
+                                      borderRadius: "9999px",
+                                    }}
+                                  >
+                                    Giảm {student.discount}%
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "0.75rem",
+                                fontSize: "0.875rem",
+                                color: "#64748b",
+                              }}
+                            >
+                              {studentData.email || student.email || "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "0.75rem",
+                                fontSize: "0.875rem",
+                                color: "#64748b",
+                              }}
+                            >
+                              {studentData.phoneNumber ||
+                                studentData.phone ||
+                                student.phoneNumber ||
+                                student.phone ||
+                                "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "0.75rem",
+                                textAlign: "center",
+                              }}
+                            >
+                              <button
+                                onClick={() =>
+                                  handleStudentClick(
+                                    student.idObj || {
+                                      id: student.id || student._id,
+                                      role: "student",
+                                      roleId: student.id || student._id,
+                                    }
+                                  )
+                                }
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                  padding: "0.375rem 0.75rem",
+                                  backgroundColor: "#3b82f6",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "0.375rem",
+                                  fontSize: "0.75rem",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                                  margin: "0 auto",
+                                }}
+                                onMouseOver={(e) => {
+                                  e.target.style.backgroundColor = "#2563eb";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.target.style.backgroundColor = "#3b82f6";
+                                }}
+                              >
+                                <FiEye />
+                                Xem
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "2rem",
+                      color: "#64748b",
+                    }}
+                  >
+                    {searchTerm
+                      ? "Không tìm thấy học sinh nào phù hợp"
+                      : "Chưa có học sinh nào trong lớp"}
+                  </div>
+                )}
+              </div>
+
+              {/* Loading state */}
+              {isLoading && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backgroundColor: "rgba(255, 255, 255, 0.8)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "0.75rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      border: "4px solid rgba(59, 130, 246, 0.3)",
+                      borderTop: "4px solid #3b82f6",
+                      borderRadius: "50%",
+                      width: "40px",
+                      height: "40px",
+                      animation: "spin 1s linear infinite",
+                    }}
+                  ></div>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
 

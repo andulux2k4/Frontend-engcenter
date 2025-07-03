@@ -1,5 +1,15 @@
 @import "../common/common.css";
 
+/* Keyframe animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 body,
 html {
   margin: 0 !important;
@@ -194,15 +204,14 @@ html {
 
 .dashboard .main-content {
   flex: 1;
-  background-color: #f8f9fa;
-  border-radius: 0;
-  padding: 2rem 2.5rem;
-  box-shadow: none;
-  min-height: calc(100vh - 64px);
-  margin-left: 0; /* Always full width */
-  overflow-y: auto;
-  width: 100%; /* Always full width */
-  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 1.5rem;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 @media (min-width: 769px) {
@@ -218,6 +227,43 @@ html {
     margin-left: 0;
     width: 100%;
   }
+}
+
+/* Special layout for Overview page */
+.dashboard .main-content.overview-layout {
+  background-color: #f8f9fa;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.dashboard .main-content.overview-layout > div {
+  padding: 1.5rem;
+}
+
+/* Responsive adjustments for Overview */
+@media (max-width: 768px) {
+  .dashboard .main-content.overview-layout > div {
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .dashboard .main-content.overview-layout {
+    margin: 0 -2rem;
+  }
+
+  .dashboard .main-content.overview-layout > div {
+    padding: 2rem;
+  }
+}
+
+/* SalaryManagement specific styles */
+.salary-section {
+  width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .section-header {
@@ -1590,7 +1636,7 @@ html {
     margin: 0;
   }
 
-  .user-profile-header {
+  .user-profile_header {
     padding: 2rem 1.5rem;
     flex-direction: column;
     text-align: center;
