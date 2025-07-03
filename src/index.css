@@ -5,17 +5,24 @@
 }
 
 :root {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
   min-height: 100vh;
-  background: linear-gradient(135deg, #fff 0%, #ffe0e0 50%, #ffc0c0 100%);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: linear-gradient(135deg, #fff 0%, #ffe0e0 50%, #ffc0c0 100%) fixed;
+  background-size: cover;
+  width: 100%;
 }
 
 #root {
   min-height: 100vh;
   width: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 a {

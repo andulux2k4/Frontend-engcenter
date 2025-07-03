@@ -1,33 +1,21 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import "../Dashboard.css";
 import "../../styles/dashboard/admin.css";
-import {
-  FiUser,
-  FiLogOut,
-  FiEdit,
-  FiTrash2,
-  FiEye,
-  FiUsers,
-  FiPhone,
-  FiMail,
-  FiLock,
-  FiSave,
-  FiX,
-  FiBook,
-  FiCalendar,
-  FiClock,
-  FiMapPin,
-  FiBarChart2,
-  FiFileText,
-  FiCheckCircle,
-  FiPlus,
-  FiMenu,
-} from "react-icons/fi";
+import { FiUser, FiLogOut, FiMenu, FiUsers } from "react-icons/fi";
 import { BiMoney } from "react-icons/bi";
-import { HiAcademicCap, HiInformationCircle } from "react-icons/hi";
+import { HiAcademicCap } from "react-icons/hi";
 import { RiDashboardLine } from "react-icons/ri";
 import { MdNotifications, MdCampaign, MdPayment } from "react-icons/md";
 import apiService from "../../services/api";
+import Overview from "./components/Overview";
+import UserManagement from "./components/UserManagement";
+import ClassManagement from "./components/ClassManagement";
+import TeacherSelectionModal from "./components/modals/TeacherSelectionModal";
+import StudentSelectionModal from "./components/modals/StudentSelectionModal";
+import UserDetailModal from "./components/modals/UserDetailModal";
+import ClassFormModal from "./components/modals/ClassFormModal";
+import UserFormModal from "./components/modals/UserFormModal";
+import ClassDetailModal from "./components/modals/ClassDetailModal";
 
 function AdminDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -95,6 +83,7 @@ function AdminDashboard({ user, onLogout }) {
 
   // Class filters and search
   const [classFilters, setClassFilters] = useState({
+    summary: "true",
     year: "",
     grade: "",
     isAvailable: "",
@@ -136,7 +125,14 @@ function AdminDashboard({ user, onLogout }) {
       // Clear error when switching away from data tabs
       setError("");
     }
-  }, [activeTab, pagination.currentPage, selectedRole, userFilters, classPagination.currentPage, classFilters]);
+  }, [
+    activeTab,
+    pagination.currentPage,
+    selectedRole,
+    userFilters,
+    classPagination.currentPage,
+    classFilters,
+  ]);
 
   const loadUsers = async () => {
     if (!user?.token) return;
@@ -146,14 +142,15 @@ function AdminDashboard({ user, onLogout }) {
 
     try {
       const filters = {};
-      
+
       // Combine selectedRole with userFilters
       if (selectedRole !== "all") {
-        filters.role = selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
+        filters.role =
+          selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
       } else if (userFilters.role) {
         filters.role = userFilters.role;
       }
-      
+
       // Add search and filter parameters
       if (userFilters.email.trim()) {
         filters.email = userFilters.email.trim();
@@ -280,8 +277,15 @@ function AdminDashboard({ user, onLogout }) {
     setError("");
 
     try {
-      const filters = { summary: "true" }; // Always get summary for list view
-      
+      const filters = {};
+
+      // Set summary parameter - mặc định lấy thông tin cơ bản cho list view
+      if (classFilters.summary !== "") {
+        filters.summary = classFilters.summary;
+      } else {
+        filters.summary = "true"; // Default value for list view
+      }
+
       // Add search and filter parameters
       if (classFilters.year) {
         filters.year = classFilters.year;
@@ -300,9 +304,9 @@ function AdminDashboard({ user, onLogout }) {
       }
 
       const response = await apiService.getClasses(
-        user.token, 
-        classPagination.currentPage, 
-        classPagination.limit, 
+        user.token,
+        classPagination.currentPage,
+        classPagination.limit,
         filters
       );
 
@@ -330,13 +334,14 @@ function AdminDashboard({ user, onLogout }) {
         }));
 
         setClasses(mappedClasses);
-        
+
         // Update pagination for classes
         if (response.pagination) {
           setClassPagination((prev) => ({
             ...prev,
             totalPages: response.pagination.totalPages || 1,
-            totalClasses: response.pagination.totalItems || response.data.length,
+            totalClasses:
+              response.pagination.totalItems || response.data.length,
           }));
         }
       } else {
@@ -481,14 +486,19 @@ function AdminDashboard({ user, onLogout }) {
   };
 
   // Handle student enrollment to class
-  const handleEnrollStudent = async (classId, studentId) => {
+  const handleEnrollStudent = async (
+    classId,
+    studentId,
+    discountPercentage = 0
+  ) => {
     if (!user?.token) return;
 
     setLoading(true);
 
     try {
-      const response = await apiService.updateClass(user.token, classId, {
-        studentList: studentId,
+      const response = await apiService.enrollStudent(user.token, studentId, {
+        classId: classId,
+        discountPercentage: discountPercentage,
       });
 
       // Backend returns: {msg, data} instead of {success, data}
@@ -1331,9 +1341,114 @@ function AdminDashboard({ user, onLogout }) {
     }
   };
 
-  const handleViewClassDetail = (classItem) => {
-    setSelectedClass(classItem);
-    setShowClassDetail(true);
+  const handleViewClassDetail = async (classId) => {
+    setLoading(true);
+    try {
+      const response = await apiService.getClassById(user.token, classId);
+      if (response.data) {
+        const classData = response.data;
+        console.log("Class data from API:", classData);
+
+        // Extract the teacherId (for user details view)
+        let teacherId = null;
+        if (classData.teacherId) {
+          if (typeof classData.teacherId === "object") {
+            // If teacherId is an object with id/user info
+            teacherId = {
+              id: classData.teacherId._id || classData.teacherId.id,
+              role: "teacher",
+              roleId: classData.teacherId._id || classData.teacherId.id,
+              name:
+                classData.teacherId.name ||
+                classData.teacherId.userId?.name ||
+                "Unknown",
+            };
+          } else {
+            // If teacherId is just a string ID
+            teacherId = {
+              id: classData.teacherId,
+              role: "teacher",
+              roleId: classData.teacherId,
+            };
+          }
+        }
+
+        // Process student list for detailed view
+        const processedStudentList = (classData.studentList || []).map(
+          (student) => {
+            // Create student object with needed information for user details view
+            const studentIdObj = {
+              id:
+                student._id ||
+                student.id ||
+                student.userId?._id ||
+                student.userId?.id,
+              role: "student",
+              roleId: student._id || student.id,
+              name: student.name || student.userId?.name || "Unknown",
+            };
+
+            return {
+              id: student._id || student.id,
+              name: student.name || student.userId?.name,
+              email: student.email || student.userId?.email,
+              discount: student.discount,
+              idObj: studentIdObj, // Store the full object for user details view
+            };
+          }
+        );
+
+        // Map API response to UI model
+        const mappedClass = {
+          id: classData._id || classData.id,
+          className: classData.className || classData.name || "Chưa có tên lớp",
+          year: classData.year || new Date().getFullYear(),
+          grade: classData.grade || 1,
+          isAvailable: classData.isAvailable !== false,
+          status: classData.isAvailable ? "Đang học" : "Đã kết thúc",
+          teacherId: teacherId, // Store the teacher ID object for user details
+          teacherName:
+            classData.teacherId?.name ||
+            classData.teacherId?.userId?.name ||
+            "Chưa phân công",
+          teacherEmail:
+            classData.teacherId?.email ||
+            classData.teacherId?.userId?.email ||
+            "",
+          teacherPhone:
+            classData.teacherId?.phoneNumber ||
+            classData.teacherId?.userId?.phoneNumber ||
+            "",
+          currentStudents: classData.studentList?.length || 0,
+          maxStudents: classData.maxStudents || 20,
+          feePerLesson: classData.feePerLesson || 0,
+          schedule: classData.schedule || {},
+          studentList: processedStudentList,
+          startDate: classData.schedule?.startDate || classData.startDate || "",
+          endDate: classData.schedule?.endDate || classData.endDate || "",
+          daysOfLessonInWeek:
+            classData.schedule?.daysOfLessonInWeek ||
+            classData.daysOfLessonInWeek ||
+            [],
+          location: classData.location || "",
+          attendanceStats: classData.attendanceStats || {
+            total: 0,
+            attended: 0,
+            missed: 0,
+          },
+        };
+
+        setSelectedClass(mappedClass);
+        setShowClassDetail(true);
+      } else {
+        setError("Không thể tải thông tin lớp học");
+      }
+    } catch (error) {
+      console.error("Error fetching class details:", error);
+      setError("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEditClass = async (classItem) => {
@@ -1403,130 +1518,62 @@ function AdminDashboard({ user, onLogout }) {
     }
   };
 
-  const handleEditClassChange = (e) => {
-    const { name, value } = e.target;
-    if (name.includes(".")) {
-      const [parent, child] = name.split(".");
-      setEditClassData((prev) => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value,
-        },
-      }));
-    } else {
-      setEditClassData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
-  };
-
-  const handleAddStudentToClass = () => {
-    // setShowAddStudent(true)
-  };
-
-  const handleRemoveStudent = (studentId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa học sinh này khỏi lớp?")) {
-      setEditClassData((prev) => ({
-        ...prev,
-        students: prev.students.filter((student) => student.id !== studentId),
-        currentStudents: prev.currentStudents - 1,
-      }));
-    }
-  };
-
-  // Dummy implementation for saving student changes in class edit modal
-  // const handleSaveStudentChanges = (studentId) => {
-  //   // You can implement API call here to save student changes if needed
-  //   // For now, just show a notification or log
-  //   alert('Đã lưu thay đổi cho học sinh!');
-  // }
-
-  const handleSaveClass = () => {
-    // Trong thực tế sẽ gọi API để lưu thông tin
-    console.log("Lưu thông tin lớp:", editClassData);
-    setShowEditClass(false);
-  };
-
-  const handleCreateClass = async () => {
+  // Handle editing a class
+  const handleClassEdit = async (classId) => {
     if (!user?.token) return;
 
     setLoading(true);
 
     try {
-      // Function to convert YYYY-MM-DD to MM/DD/YYYY format
-      const formatDateForAPI = (dateString) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        const year = date.getFullYear();
-        return `${month}/${day}/${year}`;
-      };
-
-      // Transform newClass data to match API format
-      const classData = {
-        className: newClass.name,
-        year: parseInt(newClass.year) || new Date().getFullYear(),
-        grade: parseInt(newClass.grade) || 1,
-        isAvailable: true,
-        feePerLesson: parseInt(newClass.feePerLesson) || 0,
-        schedule: {
-          startDate: formatDateForAPI(newClass.startDate),
-          endDate: formatDateForAPI(newClass.endDate),
-          daysOfLessonInWeek: newClass.daysOfLessonInWeek || [],
-        },
-        teacherId: newClass.teacherId || null,
-        studentList: [],
-      };
-
-      const response = await apiService.createClass(user.token, classData);
-
-      // Backend returns: {msg, data} instead of {success, data}
-      if (response.msg && response.msg.includes("thành công")) {
-        setShowNewClassModal(false);
-        setNewClass({
-          name: "",
-          year: new Date().getFullYear(),
-          grade: "",
-          startDate: "",
-          endDate: "",
-          feePerLesson: "",
-          teacherId: "",
-          daysOfLessonInWeek: [],
-        });
-        // Reload classes list
-        loadClasses();
-      } else {
-        setError(response.msg || "Không thể tạo lớp học");
+      const classToEdit = classes.find((c) => c.id === classId);
+      if (!classToEdit) {
+        setError("Không tìm thấy thông tin lớp học");
+        return;
       }
+
+      setSelectedClass(classToEdit);
+
+      // Format dates for the edit form
+      const formatDateForForm = (dateString) => {
+        if (!dateString) return "";
+
+        // Try to parse MM/DD/YYYY format
+        let date;
+        if (dateString.includes("/")) {
+          const parts = dateString.split("/");
+          date = new Date(
+            parseInt(parts[2]),
+            parseInt(parts[0]) - 1,
+            parseInt(parts[1])
+          );
+        } else {
+          date = new Date(dateString);
+        }
+
+        if (isNaN(date.getTime())) return "";
+
+        return date.toISOString().split("T")[0];
+      };
+
+      setEditClassData({
+        id: classToEdit.id,
+        name: classToEdit.className,
+        year: classToEdit.year.toString(),
+        grade: classToEdit.grade.toString(),
+        teacherId: classToEdit.teacherId || "",
+        feePerLesson: classToEdit.feePerLesson.toString(),
+        startDate: formatDateForForm(classToEdit.schedule?.startDate),
+        endDate: formatDateForForm(classToEdit.schedule?.endDate),
+        daysOfLessonInWeek: classToEdit.schedule?.daysOfLessonInWeek || [],
+        isAvailable: classToEdit.isAvailable,
+      });
+
+      setShowEditClass(true);
     } catch (error) {
-      console.error("Error creating class:", error);
-      setError("Lỗi kết nối. Vui lòng thử lại.");
+      console.error("Error preparing class edit:", error);
+      setError("Lỗi khi chuẩn bị chỉnh sửa lớp học");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Load available teachers for new class creation
-  const loadTeachersForNewClass = async () => {
-    if (!user?.token) return;
-
-    try {
-      const response = await apiService.getAvailableTeachers(user.token);
-
-      // Backend returns: {msg, data} instead of {success, teachers}
-      if (response.data && response.data.length > 0) {
-        setAvailableTeachers(response.data);
-        console.log("✅ Loaded teachers for new class:", response.data.length);
-      } else {
-        console.log("⚠️ No teachers found");
-        setAvailableTeachers([]);
-      }
-    } catch (error) {
-      console.error("Error loading teachers for new class:", error);
-      setAvailableTeachers([]);
     }
   };
 
@@ -1736,6 +1783,77 @@ function AdminDashboard({ user, onLogout }) {
     }
   };
 
+  // Handle creating a new class
+  const handleCreateClass = async () => {
+    if (!user?.token) return;
+
+    setLoading(true);
+
+    try {
+      // Validate required fields
+      const requiredFields = [
+        "name",
+        "year",
+        "grade",
+        "startDate",
+        "endDate",
+        "feePerLesson",
+      ];
+      const missingFields = requiredFields.filter((field) => !newClass[field]);
+
+      if (missingFields.length > 0) {
+        setError(`Vui lòng điền đầy đủ thông tin: ${missingFields.join(", ")}`);
+        setLoading(false);
+        return;
+      }
+
+      // Prepare data for API
+      const classData = {
+        className: newClass.name,
+        year: parseInt(newClass.year),
+        grade: parseInt(newClass.grade),
+        teacherId: newClass.teacherId || null,
+        feePerLesson: parseInt(newClass.feePerLesson),
+        schedule: {
+          startDate: newClass.startDate,
+          endDate: newClass.endDate,
+          daysOfLessonInWeek: newClass.daysOfLessonInWeek,
+        },
+        isAvailable: true,
+      };
+
+      const response = await apiService.createClass(user.token, classData);
+
+      // Backend returns: {msg, data} instead of {success, data}
+      if (response.msg && response.msg.includes("thành công")) {
+        // Reset the form
+        setNewClass({
+          name: "",
+          year: new Date().getFullYear(),
+          grade: "",
+          startDate: "",
+          endDate: "",
+          feePerLesson: "",
+          teacherId: "",
+          daysOfLessonInWeek: [],
+        });
+
+        // Close the modal
+        setShowNewClassModal(false);
+
+        // Reload classes list
+        loadClasses();
+      } else {
+        setError(response.msg || "Không thể tạo lớp học mới");
+      }
+    } catch (error) {
+      console.error("Error creating class:", error);
+      setError("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -1783,7 +1901,7 @@ function AdminDashboard({ user, onLogout }) {
               onClick={() => setActiveTab("users")}
             >
               <FiUsers className="icon" />
-              Quản lý Users
+              Quản lý người dùng
             </button>
             <button
               className={`nav-item ${activeTab === "classes" ? "active" : ""}`}
@@ -1829,4123 +1947,177 @@ function AdminDashboard({ user, onLogout }) {
         </aside>
 
         <main className="main-content">
-          {activeTab === "overview" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <i className="fas fa-chart-pie"></i>
-                  Tổng quan hệ thống
-                </h2>
-              </div>
-              <div
-                className="card-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)", // 3 cột mỗi hàng, nếu muốn 1 hàng thì dùng repeat(6, 1fr)
-                  gap: "1.5rem",
-                  padding: "0.5rem 0",
-                }}
-              >
-                <div
-                  className="card"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #fff 0%, #fff5f5 100%)",
-                    border: "2px solid #ffebee",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 10px 25px rgba(179, 0, 0, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div className="card-content">
-                    <h3>
-                      <FiUsers className="icon" style={{ color: "#b30000" }} />
-                      Tổng số học sinh
-                    </h3>
-                    <p
-                      className="stat"
-                      style={{
-                        fontSize: "2.5rem",
-                        fontWeight: "700",
-                        color: "#b30000",
-                        margin: "1rem 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      {mockData.stats.totalStudents}
-                    </p>
-                    <p
-                      style={{
-                        textAlign: "center",
-                        color: "#666",
-                        fontSize: "0.9rem",
-                        margin: "0",
-                      }}
-                    >
-                      Học sinh đang theo học
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-20px",
-                      right: "-20px",
-                      width: "80px",
-                      height: "80px",
-                      backgroundColor: "rgba(179, 0, 0, 0.1)",
-                      borderRadius: "50%",
-                      zIndex: 0,
-                    }}
-                  ></div>
-                </div>
-
-                <div
-                  className="card"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #fff 0%, #fff5f5 100%)",
-                    border: "2px solid #ffebee",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 10px 25px rgba(179, 0, 0, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div className="card-content">
-                    <h3>
-                      <FiUsers className="icon" style={{ color: "#b30000" }} />
-                      Tổng số giáo viên
-                    </h3>
-                    <p
-                      className="stat"
-                      style={{
-                        fontSize: "2.5rem",
-                        fontWeight: "700",
-                        color: "#b30000",
-                        margin: "1rem 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      {mockData.stats.totalTeachers}
-                    </p>
-                    <p
-                      style={{
-                        textAlign: "center",
-                        color: "#666",
-                        fontSize: "0.9rem",
-                        margin: "0",
-                      }}
-                    >
-                      Giáo viên đang giảng dạy
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-20px",
-                      right: "-20px",
-                      width: "80px",
-                      height: "80px",
-                      backgroundColor: "rgba(179, 0, 0, 0.1)",
-                      borderRadius: "50%",
-                      zIndex: 0,
-                    }}
-                  ></div>
-                </div>
-
-                <div
-                  className="card"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #fff 0%, #fff5f5 100%)",
-                    border: "2px solid #ffebee",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 10px 25px rgba(179, 0, 0, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div className="card-content">
-                    <h3>
-                      <HiAcademicCap
-                        className="icon"
-                        style={{ color: "#b30000" }}
-                      />
-                      Lớp học đang hoạt động
-                    </h3>
-                    <p
-                      className="stat"
-                      style={{
-                        fontSize: "2.5rem",
-                        fontWeight: "700",
-                        color: "#b30000",
-                        margin: "1rem 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      {mockData.stats.activeClasses}
-                    </p>
-                    <p
-                      style={{
-                        textAlign: "center",
-                        color: "#666",
-                        fontSize: "0.9rem",
-                        margin: "0",
-                      }}
-                    >
-                      Lớp học đang diễn ra
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-20px",
-                      right: "-20px",
-                      width: "80px",
-                      height: "80px",
-                      backgroundColor: "rgba(179, 0, 0, 0.1)",
-                      borderRadius: "50%",
-                      zIndex: 0,
-                    }}
-                  ></div>
-                </div>
-
-                <div
-                  className="card"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #fff 0%, #fff5f5 100%)",
-                    border: "2px solid #ffebee",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 10px 25px rgba(179, 0, 0, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div className="card-content">
-                    <h3>
-                      <BiMoney className="icon" style={{ color: "#b30000" }} />
-                      Doanh thu tháng
-                    </h3>
-                    <p
-                      className="stat"
-                      style={{
-                        fontSize: "2rem",
-                        fontWeight: "700",
-                        color: "#b30000",
-                        margin: "1rem 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      {mockData.stats.revenue} VNĐ
-                    </p>
-                    <p
-                      style={{
-                        textAlign: "center",
-                        color: "#666",
-                        fontSize: "0.9rem",
-                        margin: "0",
-                      }}
-                    >
-                      Tổng thu tháng 3/2024
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-20px",
-                      right: "-20px",
-                      width: "80px",
-                      height: "80px",
-                      backgroundColor: "rgba(179, 0, 0, 0.1)",
-                      borderRadius: "50%",
-                      zIndex: 0,
-                    }}
-                  ></div>
-                </div>
-                <div
-                  className="card"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #fff 0%, #fff5f5 100%)",
-                    border: "2px solid #ffebee",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 10px 25px rgba(179, 0, 0, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div className="card-content">
-                    <h3>
-                      <FiBarChart2
-                        className="icon"
-                        style={{ color: "#b30000" }}
-                      />
-                      Tỷ lệ hoàn thành bài tập
-                    </h3>
-                    <p
-                      className="stat"
-                      style={{
-                        fontSize: "2rem",
-                        fontWeight: "700",
-                        color: "#b30000",
-                        margin: "1rem 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      92%
-                    </p>
-                    <p
-                      style={{
-                        textAlign: "center",
-                        color: "#666",
-                        fontSize: "0.9rem",
-                        margin: "0",
-                      }}
-                    >
-                      Bài tập đã hoàn thành trong tháng
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-20px",
-                      right: "-20px",
-                      width: "80px",
-                      height: "80px",
-                      backgroundColor: "rgba(179, 0, 0, 0.1)",
-                      borderRadius: "50%",
-                      zIndex: 0,
-                    }}
-                  ></div>
-                </div>
-                <div
-                  className="card"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #fff 0%, #fff5f5 100%)",
-                    border: "2px solid #ffebee",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 10px 25px rgba(179, 0, 0, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 2px 4px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div className="card-content">
-                    <h3>
-                      <FiFileText
-                        className="icon"
-                        style={{ color: "#b30000" }}
-                      />
-                      Số lượng tài liệu
-                    </h3>
-                    <p
-                      className="stat"
-                      style={{
-                        fontSize: "2rem",
-                        fontWeight: "700",
-                        color: "#b30000",
-                        margin: "1rem 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      38
-                    </p>
-                    <p
-                      style={{
-                        textAlign: "center",
-                        color: "#666",
-                        fontSize: "0.9rem",
-                        margin: "0",
-                      }}
-                    >
-                      Tài liệu học tập hiện có
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-20px",
-                      right: "-20px",
-                      width: "80px",
-                      height: "80px",
-                      backgroundColor: "rgba(179, 0, 0, 0.1)",
-                      borderRadius: "50%",
-                      zIndex: 0,
-                    }}
-                  ></div>
-                </div>
-              </div>
-            </section>
-          )}
+          {activeTab === "overview" && <Overview stats={mockData.stats} />}
 
           {activeTab === "users" && (
-            <section>
-              <div
-                className="section-header"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "1.5rem",
-                  padding: "1.5rem",
-                  backgroundColor: "white",
-                  borderRadius: "0.75rem",
-                  boxShadow:
-                    "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                <h2
-                  className="section-title"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    margin: 0,
-                    fontSize: "1.5rem",
-                    fontWeight: "600",
-                    color: "#111827",
-                  }}
-                >
-                  <FiUsers
-                    style={{ marginRight: "0.75rem", color: "#3b82f6" }}
-                  />
-                  Quản lý Users
-                </h2>
-                <div className="section-actions">
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleAddUser}
-                    style={{
-                      padding: "0.75rem 1.5rem",
-                      backgroundColor: "#3b82f6",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.875rem",
-                      fontWeight: "500",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      boxShadow:
-                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                    }}
-                  >
-                    <FiUser style={{ fontSize: "1rem" }} />
-                    Thêm User mới
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className="filter-section"
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "1rem",
-                  marginBottom: "1.5rem",
-                  padding: "1rem",
-                  backgroundColor: "white",
-                  borderRadius: "0.5rem",
-                  boxShadow:
-                    "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                {/* Search by Name */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    minWidth: "200px",
-                  }}
-                >
-                  <FiUser style={{ color: "#6b7280" }} />
-                  <input
-                    type="text"
-                    placeholder="Tìm theo tên..."
-                    value={userFilters.name}
-                    onChange={(e) =>
-                      setUserFilters(prev => ({ ...prev, name: e.target.value }))
-                    }
-                    style={{
-                      padding: "0.5rem 0.75rem",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "0.375rem",
-                      fontSize: "0.875rem",
-                      flex: 1,
-                    }}
-                  />
-                </div>
-
-                {/* Search by Email */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    minWidth: "200px",
-                  }}
-                >
-                  <FiMail style={{ color: "#6b7280" }} />
-                  <input
-                    type="text"
-                    placeholder="Tìm theo email..."
-                    value={userFilters.email}
-                    onChange={(e) =>
-                      setUserFilters(prev => ({ ...prev, email: e.target.value }))
-                    }
-                    style={{
-                      padding: "0.5rem 0.75rem",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "0.375rem",
-                      fontSize: "0.875rem",
-                      flex: 1,
-                    }}
-                  />
-                </div>
-
-                {/* Filter by Active Status */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <label
-                    style={{
-                      fontWeight: "500",
-                      color: "#374151",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    Trạng thái:
-                  </label>
-                  <select
-                    value={userFilters.isActive}
-                    onChange={(e) =>
-                      setUserFilters(prev => ({ ...prev, isActive: e.target.value }))
-                    }
-                    style={{
-                      padding: "0.5rem 0.75rem",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "0.375rem",
-                      backgroundColor: "white",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    <option value="">Tất cả</option>
-                    <option value="true">Đang hoạt động</option>
-                    <option value="false">Ngừng hoạt động</option>
-                  </select>
-                </div>
-
-                {/* Role Filter */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <FiUsers style={{ color: "#6b7280" }} />
-                  <label
-                    htmlFor="roleFilter"
-                    style={{
-                      fontWeight: "500",
-                      color: "#374151",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    Lọc theo vai trò:
-                  </label>
-                </div>
-                <select
-                  id="roleFilter"
-                  value={selectedRole}
-                  onChange={(e) => {
-                    handleRoleFilterChange(e.target.value);
-                  }}
-                  className="role-filter"
-                  disabled={loading}
-                  style={{
-                    padding: "0.5rem 0.75rem",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "0.375rem",
-                    backgroundColor: "white",
-                    color: "#374151",
-                    fontSize: "0.875rem",
-                    cursor: loading ? "not-allowed" : "pointer",
-                    opacity: loading ? 0.5 : 1,
-                  }}
-                >
-                  <option value="all">Tất cả</option>
-                  <option value="teacher">Giáo viên</option>
-                  <option value="student">Học sinh</option>
-                  <option value="parent">Phụ huynh</option>
-                </select>
-
-                <div
-                  style={{
-                    marginLeft: "auto",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-                    Hiển thị {pagination.limit} kết quả
-                  </span>
-                </div>
-              </div>
-
-              {error && (
-                <div
-                  className="error-message"
-                  style={{
-                    padding: "1rem",
-                    backgroundColor: "#fed7d7",
-                    color: "#c53030",
-                    borderRadius: "0.375rem",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              {loading && (
-                <div
-                  className="loading-message"
-                  style={{
-                    padding: "2rem",
-                    textAlign: "center",
-                    color: "#4a5568",
-                  }}
-                >
-                  Đang tải dữ liệu...
-                </div>
-              )}
-
-              {showAddUserForm && (
-                <div
-                  className="modal-overlay"
-                  onClick={(e) => {
-                    if (e.target === e.currentTarget) {
-                      setShowAddUserForm(false);
-                      setEditingUser(null);
-                      setError("");
-                    }
-                  }}
-                >
-                  <div className="user-edit-modal">
-                    {/* Header */}
-                    <div className="user-edit-header">
-                      <button
-                        className="user-edit-close"
-                        onClick={() => {
-                          setShowAddUserForm(false);
-                          setEditingUser(null);
-                          setError("");
-                        }}
-                      ></button>
-
-                      <div className="user-edit-avatar">
-                        {editingUser
-                          ? (formData.name || editingUser.name || "U")
-                              .charAt(0)
-                              .toUpperCase()
-                          : "+"}
-                      </div>
-                      <h2 className="user-edit-name">
-                        {editingUser
-                          ? `Chỉnh sửa: ${
-                              formData.name || editingUser.name || "Người dùng"
-                            }`
-                          : "Thêm người dùng mới"}
-                      </h2>
-                      <div className="user-edit-role">
-                        {(() => {
-                          const role = formData.role?.toLowerCase() || "";
-                          switch (role) {
-                            case "teacher":
-                              return "Giáo viên";
-                            case "student":
-                              return "Học sinh";
-                            case "parent":
-                              return "Phụ huynh";
-                            case "admin":
-                              return "Quản trị viên";
-                            default:
-                              return role
-                                ? role.charAt(0).toUpperCase() + role.slice(1)
-                                : "Người dùng";
-                          }
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Body */}
-                    <div className="user-edit-body">
-                      {loading && editingUser ? (
-                        <div className="user-detail-loading">
-                          <div className="loading-spinner"></div>
-                          <div className="loading-text">
-                            Đang tải thông tin...
-                          </div>
-                        </div>
-                      ) : error ? (
-                        <div
-                          className="error-message"
-                          style={{
-                            color: "#dc2626",
-                            background: "#fee2e2",
-                            padding: "1rem",
-                            borderRadius: "8px",
-                            marginBottom: "1rem",
-                          }}
-                        >
-                          {error}
-                        </div>
-                      ) : (
-                        <form
-                          key={formKey}
-                          onSubmit={handleFormSubmit}
-                          autoComplete="off"
-                        >
-                          {/* Thông tin cơ bản */}
-                          <div className="user-edit-section">
-                            <h3>
-                              <FiUser />
-                              Thông tin cơ bản
-                            </h3>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">
-                                Họ và tên *
-                              </label>
-                              <input
-                                className="user-edit-input"
-                                type="text"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleInputChange}
-                                placeholder="Nhập họ và tên"
-                                autoComplete="off"
-                                data-lpignore="true"
-                                required
-                              />
-                            </div>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">Email *</label>
-                              <input
-                                className="user-edit-input"
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                                placeholder="Nhập địa chỉ email"
-                                autoComplete="new-email"
-                                autoFill="off"
-                                data-lpignore="true"
-                                required
-                              />
-                            </div>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">
-                                Số điện thoại *
-                              </label>
-                              <input
-                                className="user-edit-input"
-                                type="tel"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleInputChange}
-                                placeholder="Nhập số điện thoại"
-                                required
-                              />
-                            </div>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">
-                                Giới tính
-                              </label>
-                              <select
-                                className="user-edit-select"
-                                name="gender"
-                                value={formData.gender}
-                                onChange={handleInputChange}
-                              >
-                                <option value="">Chọn giới tính</option>
-                                <option value="Nam">Nam</option>
-                                <option value="Nữ">Nữ</option>
-                              </select>
-                            </div>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">Địa chỉ</label>
-                              <input
-                                className="user-edit-input"
-                                type="text"
-                                name="address"
-                                value={formData.address}
-                                onChange={handleInputChange}
-                                placeholder="Nhập địa chỉ"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Thông tin hệ thống */}
-                          <div className="user-edit-section">
-                            <h3>
-                              <FiLock />
-                              Thông tin hệ thống
-                            </h3>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">
-                                Vai trò *
-                              </label>
-                              <select
-                                className="user-edit-select"
-                                name="role"
-                                value={formData.role}
-                                onChange={handleInputChange}
-                                required
-                                disabled={editingUser} // Không cho đổi role khi edit
-                              >
-                                <option value="Student">Học sinh</option>
-                                <option value="Teacher">Giáo viên</option>
-                                <option value="Parent">Phụ huynh</option>
-                              </select>
-                              {editingUser && (
-                                <small
-                                  style={{
-                                    color: "#6b7280",
-                                    fontSize: "0.75rem",
-                                    marginTop: "0.25rem",
-                                    display: "block",
-                                  }}
-                                >
-                                  Không thể thay đổi vai trò khi chỉnh sửa
-                                </small>
-                              )}
-                            </div>
-
-                            <div className="user-edit-field">
-                              <label className="user-edit-label">
-                                Mật khẩu {!editingUser && "*"}
-                              </label>
-                              <input
-                                className="user-edit-input"
-                                type="password"
-                                name="passwordBeforeHash"
-                                value={formData.passwordBeforeHash}
-                                onChange={handleInputChange}
-                                placeholder={
-                                  editingUser
-                                    ? "Để trống để giữ nguyên mật khẩu"
-                                    : "Nhập mật khẩu"
-                                }
-                                autoComplete="new-password"
-                                autoFill="off"
-                                data-lpignore="true"
-                                minLength="8"
-                                {...(editingUser ? {} : { required: true })}
-                              />
-                              {editingUser && (
-                                <small
-                                  style={{
-                                    color: "#6b7280",
-                                    fontSize: "0.75rem",
-                                    marginTop: "0.25rem",
-                                    display: "block",
-                                  }}
-                                >
-                                  Để trống nếu không muốn thay đổi mật khẩu
-                                </small>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Thông tin theo role */}
-                          {formData.role === "Student" && (
-                            <div className="user-edit-section">
-                              <h3>
-                                <HiAcademicCap />
-                                Thông tin học sinh
-                              </h3>
-
-                              <div className="user-edit-field">
-                                <label className="user-edit-label">
-                                  Phụ huynh hiện tại
-                                </label>
-
-                                {/* Hiển thị phụ huynh hiện tại nếu có */}
-                                {formData.parentId ? (
-                                  <div style={{ marginBottom: "0.5rem" }}>
-                                    {(() => {
-                                      const currentParent = parents.find(
-                                        (p) =>
-                                          p.id === formData.parentId ||
-                                          p.roleId === formData.parentId
-                                      );
-                                      if (currentParent) {
-                                        return (
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
-                                              gap: "0.25rem",
-                                              padding: "0.25rem 0.5rem",
-                                              background: "#f3e8ff",
-                                              color: "#7c3aed",
-                                              borderRadius: "4px",
-                                              fontSize: "0.75rem",
-                                            }}
-                                          >
-                                            Phụ huynh: {currentParent.name}
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setFormData((prev) => ({
-                                                  ...prev,
-                                                  parentId: "",
-                                                }))
-                                              }
-                                              style={{
-                                                background: "none",
-                                                border: "none",
-                                                color: "#7c3aed",
-                                                cursor: "pointer",
-                                                padding: "0",
-                                                marginLeft: "0.25rem",
-                                              }}
-                                            >
-                                              ×
-                                            </button>
-                                          </span>
-                                        );
-                                      } else {
-                                        return (
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
-                                              gap: "0.25rem",
-                                              padding: "0.25rem 0.5rem",
-                                              background: "#fef3c7",
-                                              color: "#92400e",
-                                              borderRadius: "4px",
-                                              fontSize: "0.75rem",
-                                            }}
-                                          >
-                                            Phụ huynh: ID {formData.parentId}{" "}
-                                            (không tìm thấy)
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setFormData((prev) => ({
-                                                  ...prev,
-                                                  parentId: "",
-                                                }))
-                                              }
-                                              style={{
-                                                background: "none",
-                                                border: "none",
-                                                color: "#92400e",
-                                                cursor: "pointer",
-                                                padding: "0",
-                                                marginLeft: "0.25rem",
-                                              }}
-                                            >
-                                              ×
-                                            </button>
-                                          </span>
-                                        );
-                                      }
-                                    })()}
-                                  </div>
-                                ) : (
-                                  <div
-                                    style={{
-                                      padding: "0.5rem",
-                                      background: "#f9fafb",
-                                      borderRadius: "4px",
-                                      fontSize: "0.75rem",
-                                      color: "#6b7280",
-                                      marginBottom: "0.5rem",
-                                    }}
-                                  >
-                                    Chưa có phụ huynh
-                                  </div>
-                                )}
-
-                                <select
-                                  className="user-edit-select"
-                                  onChange={(e) => {
-                                    const selectedParentId = e.target.value;
-                                    console.log(
-                                      "🔍 Parent dropdown selection:",
-                                      {
-                                        selectedParentId,
-                                        currentParentId: formData.parentId,
-                                        allParents: parents,
-                                        parentsCount: parents.length,
-                                      }
-                                    );
-                                    if (
-                                      selectedParentId &&
-                                      selectedParentId !== ""
-                                    ) {
-                                      console.log(
-                                        "✅ Setting parent ID:",
-                                        selectedParentId
-                                      );
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        parentId: selectedParentId,
-                                      }));
-                                    }
-                                  }}
-                                  value=""
-                                  style={{
-                                    width: "100%",
-                                    padding: "0.75rem",
-                                    border: "1px solid #d1d5db",
-                                    borderRadius: "8px",
-                                    fontSize: "0.875rem",
-                                  }}
-                                >
-                                  <option value="">
-                                    {parents.length > 0
-                                      ? "Chọn phụ huynh"
-                                      : "Không có phụ huynh nào"}
-                                  </option>
-                                  {parents
-                                    .filter(
-                                      (p) =>
-                                        p.roleId !== formData.parentId &&
-                                        p.id !== formData.parentId
-                                    )
-                                    .map((p) => (
-                                      <option
-                                        key={p.roleId || p.id}
-                                        value={p.roleId}
-                                      >
-                                        {p.name} (ID:{" "}
-                                        {(p.id || p.roleId).slice(-6)})
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-
-                              <div className="user-edit-field">
-                                <label className="user-edit-label">
-                                  Lớp học
-                                </label>
-                                <div
-                                  style={{
-                                    padding: "0.75rem",
-                                    background: "#f0f9ff",
-                                    border: "1px solid #0ea5e9",
-                                    borderRadius: "8px",
-                                    fontSize: "0.875rem",
-                                    color: "#0c4a6e",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem",
-                                  }}
-                                >
-                                  <HiInformationCircle style={{ fontSize: "1.25rem", color: "#0ea5e9" }} />
-                                  <span>
-                                    Vui lòng tạo học sinh trước, sau đó thêm vào lớp học ở mục "Lớp học"
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {formData.role === "Teacher" && (
-                            <div className="user-edit-section">
-                              <h3>
-                                <HiAcademicCap />
-                                Thông tin giáo viên
-                              </h3>
-
-                              <div className="user-edit-field">
-                                <label className="user-edit-label">
-                                  Lương mỗi buổi học (VND) *
-                                </label>
-                                <div className="input-with-icon">
-                                  <BiMoney className="user-edit-icon" />
-                                  <input
-                                    className="user-edit-input"
-                                    type="number"
-                                    name="wagePerLesson"
-                                    value={formData.wagePerLesson}
-                                    onChange={handleInputChange}
-                                    placeholder="Ví dụ: 100000"
-                                    min="0"
-                                    step="1000"
-                                    required
-                                  />
-                                </div>
-                                <small
-                                  style={{
-                                    color: "#6b7280",
-                                    fontSize: "0.75rem",
-                                    marginTop: "0.25rem",
-                                    display: "block",
-                                  }}
-                                >
-                                  Lương được tính theo từng buổi dạy thực tế
-                                </small>
-                              </div>
-
-                              <div className="user-edit-field">
-                                <label className="user-edit-label">
-                                  Lớp đang giảng dạy
-                                </label>
-                                <select
-                                  className="user-edit-select"
-                                  onChange={(e) =>
-                                    handleClassSelect(e.target.value)
-                                  }
-                                  value=""
-                                >
-                                  <option value="">Chọn lớp dạy để thêm</option>
-                                  {allClasses
-                                    .filter(
-                                      (c) => !formData.classIds.includes(c.id)
-                                    )
-                                    .map((c) => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.className}
-                                      </option>
-                                    ))}
-                                </select>
-
-                                {formData.classIds.length > 0 && (
-                                  <div
-                                    style={{
-                                      marginTop: "0.5rem",
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      gap: "0.5rem",
-                                    }}
-                                  >
-                                    {formData.classIds.map((id) => {
-                                      // Debug thông tin cho Teacher form
-                                      if (allClasses.length === 0) {
-                                        console.log(
-                                          "⚠️ allClasses is empty for Teacher form"
-                                        );
-                                      }
-
-                                      const classItem = allClasses.find(
-                                        (c) => c.id === id || c._id === id
-                                      );
-                                      return (
-                                        <span
-                                          key={id}
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.25rem",
-                                            padding: "0.25rem 0.5rem",
-                                            background: classItem
-                                              ? "#fef3c7"
-                                              : "#fee2e2",
-                                            color: classItem
-                                              ? "#92400e"
-                                              : "#dc2626",
-                                            borderRadius: "4px",
-                                            fontSize: "0.75rem",
-                                          }}
-                                        >
-                                          {classItem
-                                            ? classItem.className ||
-                                              classItem.name
-                                            : `Lớp ID: ${id} (không tìm thấy)`}
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleRemoveClass(id)
-                                            }
-                                            style={{
-                                              background: "none",
-                                              border: "none",
-                                              color: classItem
-                                                ? "#92400e"
-                                                : "#dc2626",
-                                              cursor: "pointer",
-                                              padding: "0",
-                                              marginLeft: "0.25rem",
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {formData.role === "Parent" && (
-                            <div className="user-edit-section">
-                              <h3>
-                                <FiUsers />
-                                Thông tin phụ huynh
-                              </h3>
-
-                              <div className="user-edit-field">
-                                <label className="user-edit-label">
-                                  Con em đang theo học
-                                </label>
-
-                                {/* Hiển thị con em hiện tại nếu có */}
-                                {formData.studentIds.length > 0 ? (
-                                  <div
-                                    style={{
-                                      marginBottom: "0.5rem",
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      gap: "0.5rem",
-                                    }}
-                                  >
-                                    {formData.studentIds.map((id) => {
-                                      const student = students.find(
-                                        (s) =>
-                                          s.id === id ||
-                                          s._id === id ||
-                                          s.roleId === id
-                                      );
-                                      return (
-                                        <span
-                                          key={id}
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.25rem",
-                                            padding: "0.25rem 0.5rem",
-                                            background: student
-                                              ? "#dcfce7"
-                                              : "#fef3c7",
-                                            color: student
-                                              ? "#166534"
-                                              : "#92400e",
-                                            borderRadius: "4px",
-                                            fontSize: "0.75rem",
-                                          }}
-                                        >
-                                          {student
-                                            ? student.name
-                                            : `Học sinh ID: ${id} (không tìm thấy)`}
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleRemoveStudentFromParent(id)
-                                            }
-                                            style={{
-                                              background: "none",
-                                              border: "none",
-                                              color: student
-                                                ? "#166534"
-                                                : "#92400e",
-                                              cursor: "pointer",
-                                              padding: "0",
-                                              marginLeft: "0.25rem",
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <div
-                                    style={{
-                                      padding: "0.5rem",
-                                      background: "#f9fafb",
-                                      borderRadius: "4px",
-                                      fontSize: "0.75rem",
-                                      color: "#6b7280",
-                                      marginBottom: "0.5rem",
-                                    }}
-                                  >
-                                    Chưa có con em theo học
-                                  </div>
-                                )}
-
-                                <select
-                                  className="user-edit-select"
-                                  onChange={(e) =>
-                                    handleStudentSelect(e.target.value)
-                                  }
-                                  value=""
-                                >
-                                  <option value="">
-                                    Chọn học sinh để thêm
-                                  </option>
-                                  {students
-                                    .filter(
-                                      (s) =>
-                                        !formData.studentIds.includes(s.id) &&
-                                        !formData.studentIds.includes(s.roleId)
-                                    )
-                                    .map((s) => (
-                                      <option key={s.id} value={s.roleId}>
-                                        {s.name} (ID: {s.id.slice(-6)})
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-
-                              <div className="user-edit-field">
-                                <label className="user-edit-label">
-                                  Quyền xem thông tin giáo viên
-                                </label>
-                                <div className="user-edit-checkbox-group">
-                                  <input
-                                    className="user-edit-checkbox"
-                                    type="checkbox"
-                                    name="canViewTeacher"
-                                    checked={formData.canViewTeacher}
-                                    onChange={(e) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        canViewTeacher: e.target.checked,
-                                      }))
-                                    }
-                                  />
-                                  <label className="user-edit-checkbox-label">
-                                    Cho phép xem thông tin giáo viên
-                                  </label>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </form>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    {!loading && !error && (
-                      <div className="user-edit-actions">
-                        <button
-                          type="button"
-                          className="user-edit-btn user-edit-btn-cancel"
-                          onClick={() => {
-                            resetFormData();
-                            setShowAddUserForm(false);
-                            setEditingUser(null);
-                            setError("");
-                            setFormKey((prev) => prev + 1); // Force form re-render
-                          }}
-                        >
-                          <FiX />
-                          Hủy bỏ
-                        </button>
-                        <button
-                          type="button"
-                          className="user-edit-btn user-edit-btn-save"
-                          onClick={handleFormSubmit}
-                          disabled={loading}
-                        >
-                          <FiSave />
-                          {editingUser ? "Cập nhật" : "Thêm mới"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Users Table */}
-              {!loading && filteredUsers.length > 0 && (
-                <div style={{ marginTop: "1rem" }}>
-                  <table
-                    className="data-table"
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          backgroundColor: "#f8fafc",
-                          borderBottom: "2px solid #e2e8f0",
-                        }}
-                      >
-                        <th
-                          style={{
-                            padding: "1.25rem 1rem",
-                            textAlign: "left",
-                            fontWeight: "600",
-                            color: "#374151",
-                            borderBottom: "1px solid #e5e7eb",
-                            minWidth: "200px",
-                            width: "15%",
-                          }}
-                        >
-                          Họ và tên
-                        </th>
-                        <th
-                          style={{
-                            padding: "1.25rem 1rem",
-                            textAlign: "left",
-                            fontWeight: "600",
-                            color: "#374151",
-                            borderBottom: "1px solid #e5e7eb",
-                            minWidth: "180px",
-                            width: "19%",
-                          }}
-                        >
-                          Email
-                        </th>
-                        <th
-                          style={{
-                            padding: "1.25rem 1rem",
-                            textAlign: "left",
-                            fontWeight: "600",
-                            color: "#374151",
-                            borderBottom: "1px solid #e5e7eb",
-                            minWidth: "120px",
-                            width: "15%",
-                          }}
-                        >
-                          Số điện thoại
-                        </th>
-                        <th
-                          style={{
-                            padding: "1.25rem 1rem",
-                            textAlign: "left",
-                            fontWeight: "600",
-                            color: "#374151",
-                            borderBottom: "1px solid #e5e7eb",
-                            minWidth: "100px",
-                            width: "12.5%",
-                          }}
-                        >
-                          Vai trò
-                        </th>
-                        <th
-                          style={{
-                            padding: "1.25rem 1rem",
-                            textAlign: "left",
-                            fontWeight: "600",
-                            color: "#374151",
-                            borderBottom: "1px solid #e5e7eb",
-                            minWidth: "100px",
-                            width: "12.2%",
-                          }}
-                        >
-                          Trạng thái
-                        </th>
-                        <th
-                          style={{
-                            padding: "1.25rem 1rem",
-                            textAlign: "center",
-                            fontWeight: "600",
-                            color: "#374151",
-                            borderBottom: "1px solid #e5e7eb",
-                            minWidth: "150px",
-                            width: "16%",
-                          }}
-                        >
-                          Thao tác
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan="6"
-                            style={{
-                              textAlign: "center",
-                              padding: "4rem 1rem",
-                              color: "#6b7280",
-                              fontSize: "1rem",
-                            }}
-                          >
-                            {error
-                              ? "Có lỗi xảy ra khi tải dữ liệu"
-                              : "Không có người dùng nào"}
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredUsers.map((user, index) => (
-                          <tr
-                            key={user.id}
-                            onClick={() => handleViewUserDetail(user)}
-                            style={{
-                              backgroundColor:
-                                index % 2 === 0 ? "white" : "#f9fafb",
-                              borderBottom: "1px solid #f3f4f6",
-                              transition: "background-color 0.2s ease",
-                              minHeight: "80px",
-                              cursor: "pointer",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = "#f3f4f6";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                index % 2 === 0 ? "white" : "#f9fafb";
-                            }}
-                          >
-                            <td
-                              style={{
-                                padding: "1.25rem 1rem",
-                                fontWeight: "500",
-                                color: "#111827",
-                                verticalAlign: "middle",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.75rem",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "2.5rem",
-                                    height: "2.5rem",
-                                    borderRadius: "50%",
-                                    backgroundColor: "#3b82f6",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "white",
-                                    fontSize: "0.875rem",
-                                    fontWeight: "600",
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  {user.name?.charAt(0)?.toUpperCase() || "U"}
-                                </div>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    minWidth: 0,
-                                    flex: 1,
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontWeight: "600",
-                                      color: "#111827",
-                                      fontSize: "0.95rem",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                    }}
-                                  >
-                                    {user.name}
-                                  </span>
-                                  <span
-                                    style={{
-                                      fontSize: "0.75rem",
-                                      color: "#6b7280",
-                                      marginTop: "0.125rem",
-                                    }}
-                                  >
-                                    ID: {user.id?.slice(-8) || "N/A"}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "1.25rem 1rem",
-                                color: "#374151",
-                                verticalAlign: "middle",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.5rem",
-                                }}
-                              >
-                                <FiMail
-                                  style={{
-                                    fontSize: "1rem",
-                                    color: "#6b7280",
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span
-                                  style={{
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                  }}
-                                >
-                                  {user.email}
-                                </span>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "1.25rem 1rem",
-                                color: "#374151",
-                                verticalAlign: "middle",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.5rem",
-                                }}
-                              >
-                                <FiPhone
-                                  style={{
-                                    fontSize: "1rem",
-                                    color: "#6b7280",
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span
-                                  style={{
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                  }}
-                                >
-                                  {user.phone || "Chưa có"}
-                                </span>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "1.25rem 1rem",
-                                verticalAlign: "middle",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  padding: "0.375rem 0.875rem",
-                                  borderRadius: "9999px",
-                                  fontSize: "0.75rem",
-                                  fontWeight: "600",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  display: "inline-block",
-                                  whiteSpace: "nowrap",
-                                  ...(user.role === "teacher" && {
-                                    backgroundColor: "#dbeafe",
-                                    color: "#1e40af",
-                                  }),
-                                  ...(user.role === "student" && {
-                                    backgroundColor: "#dcfce7",
-                                    color: "#166534",
-                                  }),
-                                  ...(user.role === "parent" && {
-                                    backgroundColor: "#fef3c7",
-                                    color: "#92400e",
-                                  }),
-                                  ...(user.role === "admin" && {
-                                    backgroundColor: "#f3e8ff",
-                                    color: "#7c3aed",
-                                  }),
-                                }}
-                              >
-                                {user.role === "teacher" && "Giáo viên"}
-                                {user.role === "student" && "Học sinh"}
-                                {user.role === "parent" && "Phụ huynh"}
-                                {user.role === "admin" && "Quản trị viên"}
-                              </span>
-                            </td>
-                            <td
-                              style={{
-                                padding: "1.25rem 1rem",
-                                verticalAlign: "middle",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "0.375rem",
-                                  padding: "0.375rem 0.875rem",
-                                  borderRadius: "9999px",
-                                  fontSize: "0.75rem",
-                                  fontWeight: "600",
-                                  backgroundColor: user.status === "Đang hoạt động" ? "#dcfce7" : "#fee2e2",
-                                  color: user.status === "Đang hoạt động" ? "#166534" : "#dc2626",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "0.5rem",
-                                    height: "0.5rem",
-                                    borderRadius: "50%",
-                                    backgroundColor: user.status === "Đang hoạt động" ? "#22c55e" : "#ef4444",
-                                  }}
-                                ></div>
-                                {user.status}
-                              </span>
-                            </td>
-                            <td
-                              style={{
-                                padding: "1.25rem 1rem",
-                                textAlign: "center",
-                                verticalAlign: "middle",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: "0.5rem",
-                                  justifyContent: "center",
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <button
-                                  className="btn btn-secondary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditUser(user);
-                                  }}
-                                  disabled={loading}
-                                  style={{
-                                    padding: "0.625rem 0.875rem",
-                                    fontSize: "0.75rem",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "0.375rem",
-                                    backgroundColor: "#f3f4f6",
-                                    color: "#374151",
-                                    border: "1px solid #d1d5db",
-                                    borderRadius: "0.375rem",
-                                    cursor: loading ? "not-allowed" : "pointer",
-                                    transition: "all 0.2s ease",
-                                    opacity: loading ? 0.5 : 1,
-                                    fontWeight: "500",
-                                    minWidth: "70px",
-                                  }}
-                                >
-                                  <FiEdit style={{ fontSize: "0.875rem" }} />
-                                  Sửa
-                                </button>
-                                <button
-                                  className="btn btn-danger"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteUser(user.id);
-                                  }}
-                                  disabled={loading}
-                                  style={{
-                                    padding: "0.625rem 0.875rem",
-                                    fontSize: "0.75rem",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "0.375rem",
-                                    backgroundColor: "#fef2f2",
-                                    color: "#dc2626",
-                                    border: "1px solid #fecaca",
-                                    borderRadius: "0.375rem",
-                                    cursor: loading ? "not-allowed" : "pointer",
-                                    transition: "all 0.2s ease",
-                                    opacity: loading ? 0.5 : 1,
-                                    fontWeight: "500",
-                                    minWidth: "70px",
-                                  }}
-                                >
-                                  <FiTrash2 style={{ fontSize: "0.875rem" }} />
-                                  Xóa
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Pagination Controls */}
-              {!loading &&
-                filteredUsers.length > 0 &&
-                pagination.totalPages > 1 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: "1.5rem",
-                      padding: "1rem",
-                      backgroundColor: "white",
-                      borderRadius: "0.5rem",
-                      boxShadow:
-                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                      border: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-                      Hiển thị{" "}
-                      {(pagination.currentPage - 1) * pagination.limit + 1} -{" "}
-                      {Math.min(
-                        pagination.currentPage * pagination.limit,
-                        pagination.totalUsers
-                      )}{" "}
-                      trong tổng số {pagination.totalUsers} người dùng
-                    </div>
-
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <button
-                        onClick={() =>
-                          setPagination((prev) => ({
-                            ...prev,
-                            currentPage: prev.currentPage - 1,
-                          }))
-                        }
-                        disabled={pagination.currentPage === 1 || loading}
-                        style={{
-                          padding: "0.5rem 0.75rem",
-                          border: "1px solid #d1d5db",
-                          borderRadius: "0.375rem",
-                          backgroundColor:
-                            pagination.currentPage === 1 ? "#f3f4f6" : "white",
-                          color:
-                            pagination.currentPage === 1
-                              ? "#9ca3af"
-                              : "#374151",
-                          cursor:
-                            pagination.currentPage === 1
-                              ? "not-allowed"
-                              : "pointer",
-                          fontSize: "0.875rem",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        Trước
-                      </button>
-
-                      <div style={{ display: "flex", gap: "0.25rem" }}>
-                        {Array.from(
-                          { length: Math.min(5, pagination.totalPages) },
-                          (_, i) => {
-                            const pageNum = i + 1;
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() =>
-                                  setPagination((prev) => ({
-                                    ...prev,
-                                    currentPage: pageNum,
-                                  }))
-                                }
-                                disabled={loading}
-                                style={{
-                                  padding: "0.5rem 0.75rem",
-                                  border: "1px solid #d1d5db",
-                                  borderRadius: "0.375rem",
-                                  backgroundColor:
-                                    pagination.currentPage === pageNum
-                                      ? "#3b82f6"
-                                      : "white",
-                                  color:
-                                    pagination.currentPage === pageNum
-                                      ? "white"
-                                      : "#374151",
-                                  cursor: "pointer",
-                                  fontSize: "0.875rem",
-                                  fontWeight: "500",
-                                  transition: "all 0.2s ease",
-                                }}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          }
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() =>
-                          setPagination((prev) => ({
-                            ...prev,
-                            currentPage: Math.min(
-                              prev.currentPage + 1,
-                              prev.totalPages
-                            ),
-                          }))
-                        }
-                        disabled={
-                          loading || pagination.currentPage === pagination.totalPages
-                        }
-                        style={{
-                          padding: "0.5rem 0.75rem",
-                          border: "1px solid #d1d5db",
-                          borderRadius: "0.375rem",
-                          backgroundColor:
-                            pagination.currentPage === pagination.totalPages
-                              ? "#f3f4f6"
-                              : "white",
-                          color:
-                            pagination.currentPage === pagination.totalPages
-                              ? "#9ca3af"
-                              : "#374151",
-                          cursor:
-                            pagination.currentPage === pagination.totalPages
-                              ? "not-allowed"
-                              : "pointer",
-                          fontSize: "0.875rem",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        Sau
-                      </button>
-                    </div>
-                  </div>
-                )}
-            </section>
+            <UserManagement
+              users={users}
+              filteredUsers={filteredUsers}
+              loading={loading}
+              error={error}
+              pagination={pagination}
+              setPagination={setPagination}
+              userFilters={userFilters}
+              setUserFilters={setUserFilters}
+              selectedRole={selectedRole}
+              handleRoleFilterChange={handleRoleFilterChange}
+              showAddUserForm={showAddUserForm}
+              setShowAddUserForm={setShowAddUserForm}
+              editingUser={editingUser}
+              setEditingUser={setEditingUser}
+              formData={formData}
+              setFormData={setFormData}
+              formKey={formKey}
+              parents={parents}
+              students={students}
+              allClasses={allClasses}
+              handleInputChange={handleInputChange}
+              handleClassSelect={handleClassSelect}
+              handleRemoveClass={handleRemoveClass}
+              handleStudentSelect={handleStudentSelect}
+              handleRemoveStudentFromParent={handleRemoveStudentFromParent}
+              handleFormSubmit={handleFormSubmit}
+              resetFormData={resetFormData}
+              handleAddUser={handleAddUser}
+              handleEditUser={handleEditUser}
+              handleDeleteUser={handleDeleteUser}
+              handleViewUserDetail={handleViewUserDetail}
+            />
           )}
 
           {activeTab === "classes" && (
-            <section>
-              <div
-                className="section-header"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "1.5rem",
-                  padding: "1.5rem",
-                  backgroundColor: "white",
-                  borderRadius: "0.75rem",
-                  boxShadow:
-                    "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                  border: "1px solid #e5e7eb",
-                }}
-              >
-                <h2
-                  className="section-title"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    margin: 0,
-                    fontSize: "1.5rem",
-                    fontWeight: "600",
-                    color: "#111827",
-                  }}
-                >
-                  <FiBook
-                    style={{ marginRight: "0.75rem", color: "#3b82f6" }}
-                  />
-                  Quản lý lớp học
-                </h2>
-                <div className="section-actions">
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => setShowNewClassModal(true)}
-                    disabled={loading}
-                    style={{
-                      padding: "0.75rem 1.5rem",
-                      backgroundColor: "#3b82f6",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.875rem",
-                      fontWeight: "500",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      transition: "all 0.2s ease",
-                      boxShadow:
-                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                      opacity: loading ? 0.5 : 1,
-                    }}
-                  >
-                    <FiPlus style={{ fontSize: "1rem" }} />
-                    Tạo lớp mới
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div
-                  className="error-message"
-                  style={{
-                    padding: "1rem",
-                    backgroundColor: "#fed7d7",
-                    color: "#c53030",
-                    borderRadius: "0.5rem",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              <div
-                style={{
-                  backgroundColor: "white",
-                  borderRadius: "0.75rem",
-                  boxShadow:
-                    "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                  overflow: "hidden",
-                  border: "1px solid #e5e7eb",
-                  padding: "1.5rem",
-                  marginBottom: "1.5rem",
-                }}
-              >
-                <h2
-                  className="section-title"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    margin: 0,
-                    fontSize: "1.5rem",
-                    fontWeight: "600",
-                    color: "#111827",
-                  }}
-                >
-                  <FiBook
-                    style={{ marginRight: "0.75rem", color: "#3b82f6" }}
-                  />
-                  Quản lý lớp học
-                </h2>
-                <div className="section-actions">
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => setShowNewClassModal(true)}
-                    disabled={loading}
-                    style={{
-                      padding: "0.75rem 1.5rem",
-                      backgroundColor: "#3b82f6",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.875rem",
-                      fontWeight: "500",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      transition: "all 0.2s ease",
-                      boxShadow:
-                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                      opacity: loading ? 0.5 : 1,
-                    }}
-                  >
-                    <FiPlus style={{ fontSize: "1rem" }} />
-                    Tạo lớp mới
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div
-                  className="error-message"
-                  style={{
-                    padding: "1rem",
-                    backgroundColor: "#fed7d7",
-                    color: "#c53030",
-                    borderRadius: "0.375rem",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              {loading && (
-                <div
-                  className="loading-message"
-                  style={{
-                    padding: "2rem",
-                    textAlign: "center",
-                    color: "#4a5568",
-                  }}
-                >
-                  Đang tải dữ liệu...
-                </div>
-              )}
-
-              {!loading && (
-                <div
-                  className="card-grid"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, 1fr)",
-                    gap: "1.5rem",
-                    padding: "0.5rem 0",
-                  }}
-                >
-                  {classes.length === 0 ? (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        padding: "3rem",
-                        color: "#6b7280",
-                        backgroundColor: "white",
-                        borderRadius: "0.5rem",
-                        boxShadow:
-                          "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-                      }}
-                    >
-                      <FiBook
-                        style={{
-                          fontSize: "3rem",
-                          marginBottom: "1rem",
-                          opacity: 0.5,
-                        }}
-                      />
-                      <h3 style={{ marginBottom: "0.5rem", color: "#374151" }}>
-                        {error
-                          boxShadow:
-                            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                          border: "1px solid #e5e7eb",
-                          overflow: "hidden",
-                          transition: "all 0.2s ease",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div
-                          className="card-header"
-                          style={{
-                            padding: "1.5rem 1.5rem 1rem 1.5rem",
-                            borderBottom: "1px solid #f3f4f6",
-                            backgroundColor: "#f8fafc",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              marginBottom: "0.5rem",
-                            }}
-                          >
-                            <h3
-                              style={{
-                                margin: 0,
-                                fontSize: "1.25rem",
-                                fontWeight: "600",
-                                color: "#111827",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                              }}
-                            >
-                              <FiBook style={{ color: "#3b82f6" }} />
-                              {classItem.className}
-                            </h3>
-                            <span
-                              style={{
-                                padding: "0.25rem 0.75rem",
-                                borderRadius: "9999px",
-                                fontSize: "0.75rem",
-                                fontWeight: "500",
-                                ...(classItem.isAvailable
-                                  ? {
-                                      backgroundColor: "#dcfce7",
-                                      color: "#166534",
-                                    }
-                                  : {
-                                      backgroundColor: "#fef3c7",
-                                      color: "#92400e",
-                                    }),
-                              }}
-                            >
-                              {classItem.status}
-                            </span>
-                          </div>
-                          <p
-                            style={{
-                              margin: 0,
-                              color: "#6b7280",
-                              fontSize: "0.875rem",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                            }}
-                          >
-                            <HiAcademicCap style={{ fontSize: "1rem" }} />
-                            Lớp {classItem.grade} - Năm học {classItem.year}
-                          </p>
-                        </div>
-
-                        <div
-                          className="card-content"
-                          style={{
-                            padding: "1.5rem",
-                          }}
-                        >
-                          <div style={{ display: "grid", gap: "1rem" }}>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                              }}
-                            >
-                              <FiUser
-                                style={{ color: "#6b7280", fontSize: "1rem" }}
-                              />
-                              <span
-                                style={{ color: "#374151", fontWeight: "500" }}
-                              >
-                                Giáo viên:
-                              </span>
-                              <span style={{ color: "#6b7280" }}>
-                                {classItem.teacherName}
-                              </span>
-                            </div>
-
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                              }}
-                            >
-                              <FiUsers
-                                style={{ color: "#6b7280", fontSize: "1rem" }}
-                              />
-                              <span
-                                style={{ color: "#374151", fontWeight: "500" }}
-                              >
-                                Học sinh:
-                              </span>
-                              <span style={{ color: "#6b7280" }}>
-                                {classItem.currentStudents}/
-                                {classItem.maxStudents}
-                              </span>
-                              <div
-                                style={{
-                                  flex: 1,
-                                  height: "0.5rem",
-                                  backgroundColor: "#e5e7eb",
-                                  borderRadius: "9999px",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    height: "100%",
-                                    backgroundColor: "#3b82f6",
-                                    width: `${
-                                      (classItem.currentStudents /
-                                        classItem.maxStudents) *
-                                      100
-                                    }%`,
-                                    transition: "width 0.3s ease",
-                                  }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                              }}
-                            >
-                              <BiMoney
-                                style={{ color: "#6b7280", fontSize: "1rem" }}
-                              />
-                              <span
-                                style={{ color: "#374151", fontWeight: "500" }}
-                              >
-                                Học phí/buổi:
-                              </span>
-                              <span
-                                style={{ color: "#059669", fontWeight: "600" }}
-                              >
-                                {classItem.feePerLesson?.toLocaleString()} VNĐ
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          className="card-actions"
-                          style={{
-                            padding: "1rem 1.5rem",
-                            borderTop: "1px solid #f3f4f6",
-                            backgroundColor: "#f9fafb",
-                            display: "flex",
-                            gap: "0.5rem",
-                            justifyContent: "center",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => handleViewClassDetail(classItem)}
-                            disabled={loading}
-                            style={{
-                              padding: "0.5rem 0.75rem",
-                              fontSize: "0.75rem",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              backgroundColor: "#f3f4f6",
-                              color: "#374151",
-                              border: "1px solid #d1d5db",
-                              borderRadius: "0.375rem",
-                              cursor: loading ? "not-allowed" : "pointer",
-                              transition: "all 0.2s ease",
-                              opacity: loading ? 0.5 : 1,
-                            }}
-                          >
-                            <FiEye style={{ fontSize: "0.875rem" }} />
-                            Chi tiết
-                          </button>
-
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => handleEditClass(classItem)}
-                            disabled={loading}
-                            style={{
-                              padding: "0.5rem 0.75rem",
-                              fontSize: "0.75rem",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              backgroundColor: "#eff6ff",
-                              color: "#1d4ed8",
-                              border: "1px solid #bfdbfe",
-                              borderRadius: "0.375rem",
-                              cursor: loading ? "not-allowed" : "pointer",
-                              transition: "all 0.2s ease",
-                              opacity: loading ? 0.5 : 1,
-                            }}
-                          >
-                            <FiEdit style={{ fontSize: "0.875rem" }} />
-                            Sửa
-                          </button>
-
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => {
-                              setSelectedClassForAssignment(classItem);
-                              loadAvailableTeachers(classItem.id);
-                              setShowTeacherSelect(true);
-                            }}
-                            disabled={loading}
-                            style={{
-                              padding: "0.5rem 0.75rem",
-                              fontSize: "0.75rem",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              backgroundColor: "#e6f3ff",
-                              color: "#0066cc",
-                              border: "1px solid #b3d9ff",
-                              borderRadius: "0.375rem",
-                              cursor: loading ? "not-allowed" : "pointer",
-                              transition: "all 0.2s ease",
-                              opacity: loading ? 0.5 : 1,
-                            }}
-                            title="Phân công giáo viên"
-                          >
-                            <FiUser style={{ fontSize: "0.875rem" }} />
-                            <span style={{ fontSize: "0.75rem" }}>GV</span>
-                          </button>
-
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => {
-                              setSelectedClassForAssignment(classItem);
-                              loadAvailableStudents(classItem.id);
-                              setShowStudentSelect(true);
-                            }}
-                            disabled={loading}
-                            style={{
-                              padding: "0.5rem 0.75rem",
-                              fontSize: "0.75rem",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              backgroundColor: "#f0fff4",
-                              color: "#38a169",
-                              border: "1px solid #9ae6b4",
-                              borderRadius: "0.375rem",
-                              cursor: loading ? "not-allowed" : "pointer",
-                              transition: "all 0.2s ease",
-                              opacity: loading ? 0.5 : 1,
-                            }}
-                            title="Thêm học sinh"
-                          >
-                            <FiUsers style={{ fontSize: "0.875rem" }} />
-                            <span style={{ fontSize: "0.75rem" }}>HS</span>
-                          </button>
-
-                          <button
-                            className="action-icon delete"
-                            onClick={() => handleDeleteClass(classItem.id)}
-                            disabled={loading}
-                            title="Xóa"
-                            style={{
-                              padding: "0.5rem",
-                              fontSize: "0.75rem",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "#fef2f2",
-                              color: "#dc2626",
-                              border: "1px solid #fecaca",
-                              borderRadius: "0.375rem",
-                              cursor: loading ? "not-allowed" : "pointer",
-                              transition: "all 0.2s ease",
-                              opacity: loading ? 0.5 : 1,
-                              minWidth: "2.5rem",
-                              minHeight: "2.5rem",
-                            }}
-                          >
-                            <FiTrash2 style={{ fontSize: "0.875rem" }} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {showClassDetail && selectedClass && (
-                <div className="modal">
-                  <div className="modal-content class-detail">
-                    <h3>
-                      <i className="fas fa-edit"></i>
-                      Chi tiết lớp học: {selectedClass.name}
-                    </h3>
-
-                    <div className="class-edit-form">
-                      <div className="form-section">
-                        <h4>
-                          <i className="fas fa-info-circle"></i>
-                          Thông tin chung
-                        </h4>
-                        <div className="form-group">
-                          <label>Tên lớp:</label>
-                          <input
-                            type="text"
-                            value={selectedClass?.className || ""}
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Năm học:</label>
-                          <input
-                            type="text"
-                            value={selectedClass?.year || ""}
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Khối lớp:</label>
-                          <input
-                            type="text"
-                            value={`Lớp ${selectedClass?.grade || ""}`}
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Học phí/buổi:</label>
-                          <input
-                            type="text"
-                            value={`${
-                              selectedClass?.feePerLesson?.toLocaleString() || 0
-                            } VNĐ`}
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Trạng thái:</label>
-                          <input
-                            type="text"
-                            value={selectedClass?.status || "Chưa có thông tin"}
-                            readOnly
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-section">
-                        <h4>
-                          <i className="fas fa-chalkboard-teacher"></i>
-                          Thông tin giáo viên
-                        </h4>
-                        <div className="form-group">
-                          <label>Giáo viên:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.teacherName || "Chưa phân công"
-                            }
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Email:</label>
-                          <input
-                            type="email"
-                            value={
-                              selectedClass?.teacherEmail || "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Số điện thoại:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.teacherInfo?.phone ||
-                              "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Kinh nghiệm:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.teacherInfo?.experience ||
-                              "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Chuyên môn:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.teacherInfo?.specialty ||
-                              "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-section">
-                        <h4>
-                          <i className="fas fa-calendar-alt"></i>
-                          Lịch học
-                        </h4>
-                        <div className="form-group">
-                          <label>Ngày bắt đầu:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.schedule?.startDate
-                                ? new Date(
-                                    selectedClass.schedule.startDate
-                                  ).toLocaleDateString("vi-VN")
-                                : "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Ngày kết thúc:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.schedule?.endDate
-                                ? new Date(
-                                    selectedClass.schedule.endDate
-                                  ).toLocaleDateString("vi-VN")
-                                : "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Thứ học:</label>
-                          <input
-                            type="text"
-                            value={
-                              selectedClass?.schedule?.daysOfLessonInWeek
-                                ? selectedClass.schedule.daysOfLessonInWeek
-                                    .map((day) => {
-                                      const dayNames = {
-                                        0: "Chủ nhật",
-                                        1: "Thứ 2",
-                                        2: "Thứ 3",
-                                        3: "Thứ 4",
-                                        4: "Thứ 5",
-                                        5: "Thứ 6",
-                                        6: "Thứ 7",
-                                      };
-                                      return dayNames[day];
-                                    })
-                                    .join(", ")
-                                : "Chưa có thông tin"
-                            }
-                            readOnly
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-section full-width">
-                        <div className="section-header">
-                          <h4>
-                            <i className="fas fa-users"></i>
-                            Danh sách học viên (
-                            {selectedClass?.currentStudents || 0}/
-                            {selectedClass?.maxStudents || 20})
-                          </h4>
-                        </div>
-                        <div className="table-container">
-                          <table className="data-table">
-                            <thead>
-                              <tr>
-                                <th>Họ và tên</th>
-                                <th>Email</th>
-                                <th>Số điện thoại</th>
-                                <th>Trạng thái</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedClass?.studentList?.length > 0 ? (
-                                selectedClass.studentList.map((student) => (
-                                  <tr key={student._id}>
-                                    <td>{student.name}</td>
-                                    <td>{student.email}</td>
-                                    <td>{student.phoneNumber}</td>
-                                    <td>
-                                      <span
-                                        className={`status-badge ${
-                                          student.isActive
-                                            ? "success"
-                                            : "danger"
-                                        }`}
-                                      >
-                                        {student.isActive
-                                          ? "Đang học"
-                                          : "Ngừng hoạt động"}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))
-                              ) : (
-                                <tr>
-                                  <td
-                                    colSpan="4"
-                                    style={{
-                                      textAlign: "center",
-                                      padding: "2rem",
-                                      color: "#6b7280",
-                                    }}
-                                  >
-                                    Chưa có học viên nào trong lớp
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="form-actions">
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => setShowClassDetail(false)}
-                      >
-                        <i className="fas fa-times"></i>
-                        Đóng
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {showEditClass && (
-                <div className="modal">
-                  <div className="modal-content class-detail">
-                    <h3>
-                      <i className="fas fa-edit"></i>
-                      Chỉnh sửa lớp học: {selectedClass?.className}
-                    </h3>
-
-                    {loading ? (
-                      <div
-                        className="loading-message"
-                        style={{ padding: "3rem 0" }}
-                      >
-                        Đang tải thông tin lớp học...
-                      </div>
-                    ) : error ? (
-                      <div className="error-message">{error}</div>
-                    ) : editClassData ? (
-                      <>
-                        <div className="class-edit-form">
-                          <div className="form-section">
-                            <h4>
-                              <i className="fas fa-info-circle"></i>
-                              Thông tin chung
-                            </h4>
-                            <div className="form-group">
-                              <label>Tên lớp:</label>
-                              <input
-                                type="text"
-                                name="name"
-                                value={editClassData.name}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Trạng thái:</label>
-                              <select
-                                name="status"
-                                value={editClassData.status}
-                                onChange={handleEditClassChange}
-                              >
-                                <option value="Đang học">Đang học</option>
-                                <option value="Chưa bắt đầu">
-                                  Chưa bắt đầu
-                                </option>
-                                <option value="Đã kết thúc">Đã kết thúc</option>
-                              </select>
-                            </div>
-                            <div className="form-group">
-                              <label>Ngày bắt đầu:</label>
-                              <input
-                                type="text"
-                                name="startDate"
-                                value={editClassData.startDate}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Ngày kết thúc:</label>
-                              <input
-                                type="text"
-                                name="endDate"
-                                value={editClassData.endDate}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Học phí:</label>
-                              <input
-                                type="text"
-                                name="courseFee"
-                                value={editClassData.courseFee}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Mô tả:</label>
-                              <textarea
-                                name="description"
-                                value={editClassData.description}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="form-section">
-                            <h4>
-                              <i className="fas fa-chalkboard-teacher"></i>
-                              Thông tin giáo viên
-                            </h4>
-                            <div className="form-group">
-                              <label>Giáo viên:</label>
-                              <input
-                                type="text"
-                                name="teacher"
-                                value={editClassData.teacher}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Email:</label>
-                              <input
-                                type="email"
-                                name="teacherInfo.email"
-                                value={editClassData.teacherInfo.email}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Số điện thoại:</label>
-                              <input
-                                type="text"
-                                name="teacherInfo.phone"
-                                value={editClassData.teacherInfo.phone}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Kinh nghiệm:</label>
-                              <input
-                                type="text"
-                                name="teacherInfo.experience"
-                                value={editClassData.teacherInfo.experience}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Chuyên môn:</label>
-                              <input
-                                type="text"
-                                name="teacherInfo.specialty"
-                                value={editClassData.teacherInfo.specialty}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="form-section">
-                            <h4>
-                              <i className="fas fa-calendar-alt"></i>
-                              Lịch học
-                            </h4>
-                            <div className="form-group">
-                              <label>Lịch học:</label>
-                              <input
-                                type="text"
-                                name="schedule"
-                                value={editClassData.schedule}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Phòng học:</label>
-                              <input
-                                type="text"
-                                name="room"
-                                value={editClassData.room}
-                                onChange={handleEditClassChange}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="form-section full-width">
-                            <div className="section-header">
-                              <h4>
-                                <i className="fas fa-users"></i>
-                                Danh sách học viên (
-                                {editClassData.currentStudents}/
-                                {editClassData.maxStudents})
-                              </h4>
-                              <button
-                                className="btn btn-primary"
-                                onClick={handleAddStudentToClass}
-                              >
-                                <i className="fas fa-user-plus"></i>
-                                Thêm học viên
-                              </button>
-                            </div>
-                            <div className="table-container">
-                              <table className="data-table">
-                                <thead>
-                                  <tr>
-                                    <th>Họ và tên</th>
-                                    <th>Chuyên cần</th>
-                                    <th>Tiến độ</th>
-                                    <th>Buổi học gần nhất</th>
-                                    <th>Thao tác</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {editClassData?.students?.length > 0 ? (
-                                    editClassData.students.map((student) => (
-                                      <tr key={student.id}>
-                                        <td>{student.name}</td>
-                                        <td>
-                                          <input
-                                            type="text"
-                                            value={student.attendance}
-                                            onChange={(e) => {
-                                              const newStudents =
-                                                editClassData.students.map(
-                                                  (s) =>
-                                                    s.id === student.id
-                                                      ? {
-                                                          ...s,
-                                                          attendance:
-                                                            e.target.value,
-                                                        }
-                                                      : s
-                                                );
-                                              setEditClassData((prev) => ({
-                                                ...prev,
-                                                students: newStudents,
-                                              }));
-                                            }}
-                                          />
-                                        </td>
-                                        <td>
-                                          <select
-                                            value={student.progress}
-                                            onChange={(e) => {
-                                              const newStudents =
-                                                editClassData.students.map(
-                                                  (s) =>
-                                                    s.id === student.id
-                                                      ? {
-                                                          ...s,
-                                                          progress:
-                                                            e.target.value,
-                                                        }
-                                                      : s
-                                                );
-                                              setEditClassData((prev) => ({
-                                                ...prev,
-                                                students: newStudents,
-                                              }));
-                                            }}
-                                          >
-                                            <option value="Xuất sắc">
-                                              Xuất sắc
-                                            </option>
-                                            <option value="Tốt">Tốt</option>
-                                            <option value="Khá">Khá</option>
-                                            <option value="Trung bình">
-                                              Trung bình
-                                            </option>
-                                            <option value="Cần cải thiện">
-                                              Cần cải thiện
-                                            </option>
-                                          </select>
-                                        </td>
-                                        <td>{student.lastAttendance}</td>
-                                        <td>
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              gap: "8px",
-                                            }}
-                                          >
-                                            <button
-                                              className="action-icon save"
-                                              // onClick={() => handleSaveStudentChanges(student.id)}
-                                              title="Lưu"
-                                              style={{
-                                                color: "#38a169",
-                                                background: "white",
-                                                padding: "4px",
-                                                fontSize: "0.875rem",
-                                              }}
-                                            >
-                                              <FiSave
-                                                className="icon"
-                                                style={{ fontSize: "1.2rem" }}
-                                              />
-                                            </button>
-                                            <button
-                                              className="action-icon delete"
-                                              onClick={() =>
-                                                handleRemoveStudent(student.id)
-                                              }
-                                              title="Xóa"
-                                              style={{
-                                                color: "#e53e3e",
-                                                background: "white",
-                                                padding: "4px",
-                                                fontSize: "0.875rem",
-                                              }}
-                                            >
-                                              <FiTrash2
-                                                className="icon"
-                                                style={{ fontSize: "1.2rem" }}
-                                              />
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))
-                                  ) : (
-                                    <tr>
-                                      <td
-                                        colSpan="5"
-                                        style={{
-                                          textAlign: "center",
-                                          padding: "2rem",
-                                          color: "#6b7280",
-                                        }}
-                                      >
-                                        Chưa có học viên nào trong lớp
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-actions">
-                          <button
-                            className="btn btn-primary"
-                            onClick={handleSaveClass}
-                          >
-                            <i className="fas fa-save"></i>
-                            Lưu thay đổi
-                          </button>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => setShowEditClass(false)}
-                          >
-                            <i className="fas fa-times"></i>
-                            Hủy
-                          </button>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              )}
-
-              {/* New Class Modal */}
-              {showNewClassModal && (
-                <div className="modal">
-                  <div className="modal-content">
-                    <h3>
-                      <FiPlus className="icon" />
-                      Tạo lớp học mới
-                    </h3>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleCreateClass();
-                      }}
-                    >
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <FiBook className="icon" />
-                          <input
-                            type="text"
-                            id="className"
-                            value={newClass.name}
-                            onChange={(e) =>
-                              setNewClass({ ...newClass, name: e.target.value })
-                            }
-                            placeholder="Ví dụ: 3A1, 4B2"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <FiCalendar className="icon" />
-                          <input
-                            type="number"
-                            id="year"
-                            value={newClass.year}
-                            onChange={(e) =>
-                              setNewClass({
-                                ...newClass,
-                                year: parseInt(e.target.value),
-                              })
-                            }
-                            min="2020"
-                            max="2030"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <HiAcademicCap className="icon" />
-                          <select
-                            id="grade"
-                            value={newClass.grade}
-                            onChange={(e) =>
-                              setNewClass({
-                                ...newClass,
-                                grade: parseInt(e.target.value),
-                              })
-                            }
-                            required
-                          >
-                            <option value="">Chọn khối lớp</option>
-                            <option value="1">Lớp 1</option>
-                            <option value="2">Lớp 2</option>
-                            <option value="3">Lớp 3</option>
-                            <option value="4">Lớp 4</option>
-                            <option value="5">Lớp 5</option>
-                            <option value="6">Lớp 6</option>
-                            <option value="7">Lớp 7</option>
-                            <option value="8">Lớp 8</option>
-                            <option value="9">Lớp 9</option>
-                            <option value="10">Lớp 10</option>
-                            <option value="11">Lớp 11</option>
-                            <option value="12">Lớp 12</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <BiMoney className="icon" />
-                          <input
-                            type="number"
-                            id="feePerLesson"
-                            value={newClass.feePerLesson}
-                            onChange={(e) =>
-                              setNewClass({
-                                ...newClass,
-                                feePerLesson: parseInt(e.target.value),
-                              })
-                            }
-                            min="0"
-                            placeholder="Ví dụ: 100000"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <FiCalendar className="icon" />
-                          <input
-                            type="date"
-                            id="startDate"
-                            value={newClass.startDate}
-                            onChange={(e) =>
-                              setNewClass({
-                                ...newClass,
-                                startDate: e.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <FiCalendar className="icon" />
-                          <input
-                            type="date"
-                            id="endDate"
-                            value={newClass.endDate}
-                            onChange={(e) =>
-                              setNewClass({
-                                ...newClass,
-                                endDate: e.target.value,
-                              })
-                            }
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: "0.5rem",
-                            marginTop: "0.5rem",
-                          }}
-                        >
-                          {[
-                            { value: 1, label: "Chủ nhật" },
-                            { value: 2, label: "Thứ 2" },
-                            { value: 3, label: "Thứ 3" },
-                            { value: 4, label: "Thứ 4" },
-                            { value: 5, label: "Thứ 5" },
-                            { value: 6, label: "Thứ 6" },
-                            { value: 7, label: "Thứ 7" },
-                          ].map((day) => (
-                            <label
-                              key={day.value}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={newClass.daysOfLessonInWeek.includes(
-                                  day.value
-                                )}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setNewClass({
-                                      ...newClass,
-                                      daysOfLessonInWeek: [
-                                        ...newClass.daysOfLessonInWeek,
-                                        day.value,
-                                      ],
-                                    });
-                                  } else {
-                                    setNewClass({
-                                      ...newClass,
-                                      daysOfLessonInWeek:
-                                        newClass.daysOfLessonInWeek.filter(
-                                          (d) => d !== day.value
-                                        ),
-                                    });
-                                  }
-                                }}
-                              />
-                              <span style={{ fontSize: "0.875rem" }}>
-                                {day.label}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <div className="input-with-icon">
-                          <FiUser className="icon" />
-                          <select
-                            id="teacherId"
-                            value={newClass.teacherId}
-                            onChange={(e) =>
-                              setNewClass({
-                                ...newClass,
-                                teacherId: e.target.value,
-                              })
-                            }
-                            onFocus={() => loadTeachersForNewClass()}
-                          >
-                            <option value="">
-                              Chọn giáo viên (để trống nếu chưa phân công)
-                            </option>
-                            {availableTeachers.map((teacher) => (
-                              <option key={teacher._id} value={teacher._id}>
-                                {teacher.userId?.name || "Chưa có tên"} -{" "}
-                                {teacher.specialization || "Chưa có chuyên môn"}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <small
-                          style={{ color: "#6b7280", fontSize: "0.875rem" }}
-                        >
-                          Có thể để trống và phân công giáo viên sau
-                        </small>
-                      </div>
-
-                      <div className="form-actions">
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => setShowNewClassModal(false)}
-                          disabled={loading}
-                        >
-                          <FiX className="icon" />
-                          Hủy
-                        </button>
-                        <button
-                          type="submit"
-                          className="btn btn-primary"
-                          disabled={loading}
-                        >
-                          <FiSave className="icon" />
-                          {loading ? "Đang tạo..." : "Tạo lớp"}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </section>
+            <ClassManagement
+              classes={classes}
+              loading={loading}
+              error={error}
+              classPagination={classPagination}
+              setClassPagination={setClassPagination}
+              classFilters={classFilters}
+              setClassFilters={setClassFilters}
+              allTeachers={allTeachers}
+              showNewClassModal={showNewClassModal}
+              setShowNewClassModal={setShowNewClassModal}
+              showClassDetail={showClassDetail}
+              setShowClassDetail={setShowClassDetail}
+              showEditClass={showEditClass}
+              setShowEditClass={setShowEditClass}
+              selectedClass={selectedClass}
+              setSelectedClass={setSelectedClass}
+              editClassData={editClassData}
+              setEditClassData={setEditClassData}
+              newClass={newClass}
+              setNewClass={setNewClass}
+              handleCreateClass={handleCreateClass}
+              handleDeleteClass={handleDeleteClass}
+              handleClassEdit={handleClassEdit}
+              handleViewClassDetail={handleViewClassDetail}
+              handleClassSelect={handleClassSelect}
+              user={user}
+            />
           )}
 
           {activeTab === "payments" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <i className="fas fa-money-bill-wave"></i>
-                  Quản lý thanh toán
-                </h2>
-              </div>
-              <table className="data-table payment-table">
-                <thead>
-                  <tr>
-                    <th>Học viên</th>
-                    <th>Khóa học</th>
-                    <th>Số tiền</th>
-                    <th>Ngày</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockData.payments.map((payment) => (
-                    <tr key={payment.id}>
-                      <td>{payment.student}</td>
-                      <td>{payment.course}</td>
-                      <td>{payment.amount} VNĐ</td>
-                      <td>{payment.date}</td>
-                      <td>
-                        <span
-                          className={`status-badge ${
-                            payment.status === "Đã thanh toán"
-                              ? "success"
-                              : "warning"
-                          }`}
-                        >
-                          <i className="fas fa-circle"></i>
-                          {payment.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+            <div className="section-placeholder">
+              <h2>Thanh toán</h2>
+              <p>Tính năng này đang được phát triển.</p>
+            </div>
           )}
-          {activeTab === "notifications" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdNotifications className="icon" />
-                  Quản lý Thông báo
-                </h2>
-              </div>
-              <div
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#b30000",
-                  fontWeight: 500,
-                }}
-              >
-                Chức năng quản lý thông báo sẽ được phát triển tại đây.
-              </div>
-            </section>
-          )}
-          {activeTab === "advertisements" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdCampaign className="icon" />
-                  Quản lý Quảng cáo
-                </h2>
-              </div>
-              <div
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#b30000",
-                  fontWeight: 500,
-                }}
-              >
-                Chức năng quản lý quảng cáo sẽ được phát triển tại đây.
-              </div>
-            </section>
-          )}
+
           {activeTab === "tuition" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdPayment className="icon" />
-                  Quản lý Học phí
-                </h2>
-              </div>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Học viên</th>
-                    <th>Khóa học</th>
-                    <th>Số tiền</th>
-                    <th>Ngày</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockData.payments.map((payment) => (
-                    <tr key={payment.id}>
-                      <td>{payment.student}</td>
-                      <td>{payment.course}</td>
-                      <td>{payment.amount} VNĐ</td>
-                      <td>{payment.date}</td>
-                      <td>
-                        <span
-                          className={`status-badge ${
-                            payment.status === "Đã thanh toán"
-                              ? "success"
-                              : "warning"
-                          }`}
-                        >
-                          <i className="fas fa-circle"></i>
-                          {payment.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+            <div className="section-placeholder">
+              <h2>Học phí</h2>
+              <p>Tính năng này đang được phát triển.</p>
+            </div>
           )}
+
           {activeTab === "notifications" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdNotifications className="icon" />
-                  Quản lý Thông báo
-                </h2>
-              </div>
-              <div
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#b30000",
-                  fontWeight: 500,
-                }}
-              >
-                Chức năng quản lý thông báo sẽ được phát triển tại đây.
-              </div>
-            </section>
+            <div className="section-placeholder">
+              <h2>Thông báo</h2>
+              <p>Tính năng này đang được phát triển.</p>
+            </div>
           )}
+
           {activeTab === "advertisements" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdCampaign className="icon" />
-                  Quản lý Quảng cáo
-                </h2>
-              </div>
-              <div
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#b30000",
-                  fontWeight: 500,
-                }}
-              >
-                Chức năng quản lý quảng cáo sẽ được phát triển tại đây.
-              </div>
-            </section>
-          )}
-          {activeTab === "tuition" && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdPayment className="icon" />
-                  Quản lý Học phí
-                </h2>
-              </div>
-              <div
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#b30000",
-                  fontWeight: 500,
-                }}
-              >
-                Chức năng quản lý học phí sẽ được phát triển tại đây.
-              </div>
-            </section>
+            <div className="section-placeholder">
+              <h2>Quảng cáo</h2>
+              <p>Tính năng này đang được phát triển.</p>
+            </div>
           )}
         </main>
       </div>
 
       {/* Teacher Selection Modal */}
-      {showTeacherSelect && selectedClassForAssignment && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>
-              <FiUser className="icon" />
-              Phân công giáo viên cho lớp:{" "}
-              {selectedClassForAssignment.className}
-            </h3>
-
-            {loading && (
-              <div
-                className="loading-message"
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#4a5568",
-                }}
-              >
-                Đang tải danh sách giáo viên...
-              </div>
-            )}
-
-            {!loading && (
-              <div className="teacher-list">
-                {availableTeachers.length === 0 ? (
-                  <div
-                    style={{
-                      textAlign: "center",
-                      padding: "2rem",
-                      color: "#6b7280",
-                    }}
-                  >
-                    Không có giáo viên khả dụng để phân công
-                  </div>
-                ) : (
-                  <div
-                    className="card-grid"
-                    style={{
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(300px, 1fr))",
-                    }}
-                  >
-                    {availableTeachers.map((teacher) => (
-                      <div
-                        key={teacher._id}
-                        className="card"
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div className="card-content">
-                          <h4>{teacher.userId?.name || "Chưa có tên"}</h4>
-                          <p>
-                            <strong>Email:</strong>{" "}
-                            {teacher.userId?.email || "Chưa có email"}
-                          </p>
-                          <p>
-                            <strong>Chuyên môn:</strong>{" "}
-                            {teacher.specialization || "Chưa có thông tin"}
-                          </p>
-                          <p>
-                            <strong>Kinh nghiệm:</strong>{" "}
-                            {teacher.experience || 0} năm
-                          </p>
-                          <p>
-                            <strong>Lớp hiện tại:</strong>{" "}
-                            {teacher.currentClasses?.length || 0} lớp
-                          </p>
-                        </div>
-                        <div
-                          className="card-actions"
-                          style={{ padding: "1rem", textAlign: "center" }}
-                        >
-                          <button
-                            className="btn btn-primary"
-                            onClick={() =>
-                              handleAssignTeacher(
-                                selectedClassForAssignment.id,
-                                teacher._id
-                              )
-                            }
-                            disabled={loading}
-                          >
-                            <FiUser className="icon" />
-                            Phân công
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="form-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowTeacherSelect(false);
-                  setSelectedClassForAssignment(null);
-                }}
-              >
-                <FiX className="icon" />
-                Hủy
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherSelectionModal
+        showTeacherSelect={showTeacherSelect}
+        selectedClassForAssignment={selectedClassForAssignment}
+        availableTeachers={availableTeachers}
+        loading={loading}
+        handleAssignTeacher={handleAssignTeacher}
+        setShowTeacherSelect={setShowTeacherSelect}
+        setSelectedClassForAssignment={setSelectedClassForAssignment}
+      />
 
       {/* Student Selection Modal */}
-      {showStudentSelect && selectedClassForAssignment && (
-        <div className="modal">
-          <div className="modal-content">
-            <h3>
-              <FiUsers className="icon" />
-              Thêm học sinh vào lớp: {selectedClassForAssignment.className}
-            </h3>
-
-            {loading && (
-              <div
-                className="loading-message"
-                style={{
-                  padding: "2rem",
-                  textAlign: "center",
-                  color: "#4a5568",
-                }}
-              >
-                Đang tải danh sách học sinh...
-              </div>
-            )}
-
-            {!loading && (
-              <div className="student-list">
-                {availableStudents.length === 0 ? (
-                  <div
-                    style={{
-                      textAlign: "center",
-                      padding: "2rem",
-                      color: "#6b7280",
-                    }}
-                  >
-                    Không có học sinh khả dụng để thêm vào lớp
-                  </div>
-                ) : (
-                  <div
-                    className="card-grid"
-                    style={{
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(300px, 1fr))",
-                    }}
-                  >
-                    {availableStudents.map((student) => (
-                      <div
-                        key={student._id}
-                        className="card"
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div className="card-content">
-                          <h4>{student.userId?.name || "Chưa có tên"}</h4>
-                          <p>
-                            <strong>Email:</strong>{" "}
-                            {student.userId?.email || "Chưa có email"}
-                          </p>
-                          <p>
-                            <strong>Số điện thoại:</strong>{" "}
-                            {student.userId?.phoneNumber ||
-                              "Chưa có số điện thoại"}
-                          </p>
-                          <p>
-                            <strong>Lớp hiện tại:</strong>{" "}
-                            {student.currentClasses?.length || 0} lớp
-                          </p>
-                          <p>
-                            <strong>Phụ huynh:</strong>{" "}
-                            {student.parentId?.name || "Chưa có thông tin"}
-                          </p>
-                        </div>
-                        <div
-                          className="card-actions"
-                          style={{ padding: "1rem", textAlign: "center" }}
-                        >
-                          <button
-                            className="btn btn-primary"
-                            onClick={() =>
-                              handleEnrollStudent(
-                                selectedClassForAssignment.id,
-                                student._id
-                              )
-                            }
-                            disabled={loading}
-                          >
-                            <FiUsers className="icon" />
-                            Thêm vào lớp
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="form-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowStudentSelect(false);
-                  setSelectedClassForAssignment(null);
-                }}
-              >
-                <FiX className="icon" />
-                Hủy
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StudentSelectionModal
+        showStudentSelect={showStudentSelect}
+        selectedClassForAssignment={selectedClassForAssignment}
+        availableStudents={availableStudents}
+        loading={loading}
+        handleEnrollStudent={handleEnrollStudent}
+        setShowStudentSelect={setShowStudentSelect}
+        setSelectedClassForAssignment={setSelectedClassForAssignment}
+        handleViewUserDetail={handleViewUserDetail}
+      />
 
       {/* User Detail Modal */}
-      {showUserDetail && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowUserDetail(false);
-              setSelectedUserDetail(null);
-              setError("");
-            }
-          }}
-        >
-          <div className="user-detail-modal">
-            {/* Header */}
-            <div className="user-detail-header">
-              <button
-                className="user-detail-close"
-                onClick={() => {
-                  setShowUserDetail(false);
-                  setSelectedUserDetail(null);
-                  setError("");
-                }}
-              ></button>
+      <UserDetailModal
+        showUserDetail={showUserDetail}
+        userDetailLoading={userDetailLoading}
+        selectedUserDetail={selectedUserDetail}
+        setShowUserDetail={setShowUserDetail}
+        setSelectedUserDetail={setSelectedUserDetail}
+        setError={setError}
+      />
 
-              {userDetailLoading ? (
-                <div className="user-detail-loading">
-                  <div className="loading-spinner"></div>
-                  <div className="loading-text">Đang tải thông tin...</div>
-                </div>
-              ) : selectedUserDetail ? (
-                <>
-                  <div className="user-detail-avatar">
-                    {(
-                      selectedUserDetail.name ||
-                      selectedUserDetail.userId?.name ||
-                      "U"
-                    )
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-                  <h2 className="user-detail-name">
-                    {selectedUserDetail.name ||
-                      selectedUserDetail.userId?.name ||
-                      "Chưa có tên"}
-                  </h2>
-                  <div className="user-detail-role">
-                    {(() => {
-                      // Lấy role từ nhiều nguồn có thể
-                      const userRole =
-                        selectedUserDetail.role ||
-                        selectedUserDetail.userId?.role ||
-                        selectedUserDetail.originalRole ||
-                        "";
+      {/* Class Detail Modal */}
+      <ClassDetailModal
+        showClassDetail={showClassDetail}
+        selectedClass={selectedClass}
+        setShowClassDetail={setShowClassDetail}
+        setSelectedClass={setSelectedClass}
+        setError={setError}
+        handleViewUserDetail={handleViewUserDetail}
+      />
 
-                      const normalizedRole = userRole.toLowerCase();
+      {/* Class Form Modal - for editing classes */}
+      <ClassFormModal
+        isEdit={true}
+        showModal={showEditClass}
+        setShowModal={setShowEditClass}
+        classData={editClassData}
+        setClassData={setEditClassData}
+        allTeachers={allTeachers}
+        handleSubmit={() => handleClassEdit(editClassData.id)}
+        loading={loading}
+      />
 
-                      switch (normalizedRole) {
-                        case "teacher":
-                          return "Giáo viên";
-                        case "student":
-                          return "Học viên";
-                        case "parent":
-                          return "Phụ huynh";
-                        case "admin":
-                          return "Quản trị viên";
-                        default:
-                          return userRole
-                            ? userRole.charAt(0).toUpperCase() +
-                                userRole.slice(1)
-                            : "Chưa xác định";
-                      }
-                    })()}
-                  </div>
-                </>
-              ) : (
-                <div className="user-detail-loading">
-                  <div className="loading-text">Không thể tải thông tin</div>
-                </div>
-              )}
-            </div>
-
-            {/* Body */}
-            {!userDetailLoading && selectedUserDetail && (
-              <div className="user-detail-body">
-                {/* Basic Information */}
-                <div className="user-detail-section">
-                  <h3 className="section-title">
-                    <FiUser className="icon" />
-                    Thông tin cơ bản
-                  </h3>
-
-                  <div className="info-row">
-                    <span className="info-label">Email:</span>
-                    <span className="info-value">
-                      {selectedUserDetail.email ||
-                        selectedUserDetail.userId?.email ||
-                        "Chưa có email"}
-                    </span>
-                  </div>
-
-                  <div className="info-row">
-                    <span className="info-label">Số điện thoại:</span>
-                    <span className="info-value">
-                      {selectedUserDetail.phone ||
-                        selectedUserDetail.phoneNumber ||
-                        selectedUserDetail.userId?.phoneNumber ||
-                        "Chưa có"}
-                    </span>
-                  </div>
-
-                  <div className="info-row">
-                    <span className="info-label">Giới tính:</span>
-                    <span className="info-value">
-                      {selectedUserDetail.gender ||
-                        selectedUserDetail.userId?.gender ||
-                        "Chưa có"}
-                    </span>
-                  </div>
-
-                  <div className="info-row">
-                    <span className="info-label">Địa chỉ:</span>
-                    <span className="info-value">
-                      {selectedUserDetail.address ||
-                        selectedUserDetail.userId?.address ||
-                        "Chưa có"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Role Specific Information */}
-                {(selectedUserDetail.role?.toLowerCase() === "student" ||
-                  selectedUserDetail.userId?.role === "student") && (
-                  <div className="user-detail-section">
-                    <h3 className="section-title">
-                      <HiAcademicCap className="icon" />
-                      Thông tin học viên
-                    </h3>
-
-                    <div className="info-row">
-                      <span className="info-label">Lớp học hiện tại:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.classId?.length ||
-                          selectedUserDetail.currentClasses?.length ||
-                          0}{" "}
-                        lớp
-                      </span>
-                    </div>
-
-                    {/* Hiển thị danh sách lớp cụ thể cho Student */}
-                    {(selectedUserDetail.classId?.length > 0 ||
-                      selectedUserDetail.currentClasses?.length > 0) && (
-                      <div className="info-row">
-                        <span className="info-label">Danh sách lớp:</span>
-                        <div className="info-value">
-                          {(
-                            selectedUserDetail.classId ||
-                            selectedUserDetail.currentClasses ||
-                            []
-                          ).map((cls, index) => (
-                            <div
-                              key={cls._id || cls.id || index}
-                              style={{
-                                display: "inline-block",
-                                padding: "0.25rem 0.5rem",
-                                margin: "0.25rem 0.25rem 0.25rem 0",
-                                background: "#e0f2fe",
-                                color: "#0c4a6e",
-                                borderRadius: "4px",
-                                fontSize: "0.75rem",
-                              }}
-                            >
-                              {cls.className ||
-                                cls.name ||
-                                `Lớp ${cls._id || cls.id || index + 1}`}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="info-row">
-                      <span className="info-label">Phụ huynh:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.parentId?.name ||
-                          selectedUserDetail.parentId?.userId?.name ||
-                          "Chưa có"}
-                      </span>
-                    </div>
-
-                    {selectedUserDetail.parentId?.userId?.email && (
-                      <div className="info-row">
-                        <span className="info-label">Email phụ huynh:</span>
-                        <span className="info-value">
-                          {selectedUserDetail.parentId.userId.email}
-                        </span>
-                      </div>
-                    )}
-
-                    {selectedUserDetail.parentId?.userId?.phoneNumber && (
-                      <div className="info-row">
-                        <span className="info-label">SĐT phụ huynh:</span>
-                        <span className="info-value">
-                          {selectedUserDetail.parentId.userId.phoneNumber}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(selectedUserDetail.role?.toLowerCase() === "teacher" ||
-                  selectedUserDetail.userId?.role === "teacher") && (
-                  <div className="user-detail-section">
-                    <h3 className="section-title">
-                      <FiBook className="icon" />
-                      Thông tin giáo viên
-                    </h3>
-
-                    <div className="info-row">
-                      <span className="info-label">Lương mỗi buổi:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.wagePerLesson
-                          ? `${new Intl.NumberFormat("vi-VN").format(
-                              selectedUserDetail.wagePerLesson
-                            )} VND`
-                          : "Chưa thiết lập"}
-                      </span>
-                    </div>
-
-                    <div className="info-row">
-                      <span className="info-label">Số lớp đang dạy:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.classId?.length ||
-                          selectedUserDetail.currentClasses?.length ||
-                          0}{" "}
-                        lớp
-                      </span>
-                    </div>
-
-                    {/* Hiển thị danh sách lớp cụ thể */}
-                    {(selectedUserDetail.classId?.length > 0 ||
-                      selectedUserDetail.currentClasses?.length > 0) && (
-                      <div className="info-row">
-                        <span className="info-label">Danh sách lớp:</span>
-                        <div className="info-value">
-                          {(
-                            selectedUserDetail.classId ||
-                            selectedUserDetail.currentClasses ||
-                            []
-                          ).map((cls, index) => (
-                            <div
-                              key={cls._id || cls.id || index}
-                              style={{
-                                display: "inline-block",
-                                padding: "0.25rem 0.5rem",
-                                margin: "0.25rem 0.25rem 0.25rem 0",
-                                background: "#fef3c7",
-                                color: "#92400e",
-                                borderRadius: "4px",
-                                fontSize: "0.75rem",
-                              }}
-                            >
-                              {cls.className ||
-                                cls.name ||
-                                `Lớp ${cls._id || cls.id || index + 1}`}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="info-row">
-                      <span className="info-label">Trạng thái:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.isDeleted
-                          ? "Ngừng hoạt động"
-                          : "Đang hoạt động"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {(selectedUserDetail.role?.toLowerCase() === "parent" ||
-                  selectedUserDetail.userId?.role === "parent") && (
-                  <div className="user-detail-section">
-                    <h3 className="section-title">
-                      <FiUsers className="icon" />
-                      Thông tin phụ huynh
-                    </h3>
-
-                    <div className="info-row">
-                      <span className="info-label">Số con:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.childId?.length ||
-                          selectedUserDetail.studentIds?.length ||
-                          selectedUserDetail.children?.length ||
-                          0}{" "}
-                        học viên
-                      </span>
-                    </div>
-
-                    <div className="info-row">
-                      <span className="info-label">Xem thông tin GV:</span>
-                      <span className="info-value">
-                        {selectedUserDetail.canSeeTeacher ? "Có" : "Không"}
-                      </span>
-                    </div>
-
-                    {(selectedUserDetail.childId?.length > 0 ||
-                      selectedUserDetail.studentIds?.length > 0) && (
-                      <div className="children-list">
-                        <h4
-                          style={{
-                            margin: "1rem 0 0.5rem 0",
-                            fontSize: "0.9rem",
-                            color: "#4a5568",
-                          }}
-                        >
-                          Danh sách con:
-                        </h4>
-                        {(
-                          selectedUserDetail.childId ||
-                          selectedUserDetail.studentIds ||
-                          []
-                        ).map((child, index) => (
-                          <div key={child._id || index} className="child-item">
-                            <div className="child-name">
-                              {child.userId?.name ||
-                                child.name ||
-                                `Học viên ${index + 1}`}
-                            </div>
-                            <div className="child-details">
-                              Email:{" "}
-                              {child.userId?.email || child.email || "Chưa có"}{" "}
-                              | Giới tính:{" "}
-                              {child.userId?.gender ||
-                                child.gender ||
-                                "Chưa có"}{" "}
-                              | Số lớp: {child.classId?.length || 0}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* System Information */}
-                <div className="user-detail-section">
-                  <h3 className="section-title">
-                    <FiBarChart2 className="icon" />
-                    Thông tin hệ thống
-                  </h3>
-
-                  <div className="info-row">
-                    <span className="info-label">ID người dùng:</span>
-                    <span
-                      className="info-value"
-                      style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
-                    >
-                      {selectedUserDetail._id || selectedUserDetail.id || "N/A"}
-                    </span>
-                  </div>
-
-                  <div className="info-row">
-                    <span className="info-label">Ngày tạo:</span>
-                    <span className="info-value">
-                      {selectedUserDetail.createdAt ||
-                      selectedUserDetail.userId?.createdAt
-                        ? new Date(
-                            selectedUserDetail.createdAt ||
-                              selectedUserDetail.userId.createdAt
-                          ).toLocaleDateString("vi-VN", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })
-                        : "N/A"}
-                    </span>
-                  </div>
-
-                  <div className="info-row">
-                    <span className="info-label">Cập nhật lần cuối:</span>
-                    <span className="info-value">
-                      {selectedUserDetail.updatedAt ||
-                      selectedUserDetail.userId?.updatedAt
-                        ? new Date(
-                            selectedUserDetail.updatedAt ||
-                              selectedUserDetail.userId.updatedAt
-                          ).toLocaleDateString("vi-VN", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })
-                        : "N/A"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* User Form Modal - for adding/editing users */}
+      <UserFormModal
+        showModal={showAddUserForm}
+        setShowModal={setShowAddUserForm}
+        formData={formData}
+        setFormData={setFormData}
+        handleSubmit={handleFormSubmit}
+        loading={loading}
+        error={error}
+        setError={setError}
+        parents={parents}
+        students={students}
+        allClasses={allClasses}
+        formKey={formKey}
+        editingUser={editingUser}
+        setEditingUser={setEditingUser}
+      />
     </div>
   );
 }
