@@ -24,7 +24,7 @@ import {
   FiMenu,
 } from "react-icons/fi";
 import { BiMoney } from "react-icons/bi";
-import { HiAcademicCap } from "react-icons/hi";
+import { HiAcademicCap, HiInformationCircle } from "react-icons/hi";
 import { RiDashboardLine } from "react-icons/ri";
 import { MdNotifications, MdCampaign, MdPayment } from "react-icons/md";
 import apiService from "../../services/api";
@@ -84,6 +84,33 @@ function AdminDashboard({ user, onLogout }) {
     limit: 10,
   });
 
+  // User filters and search
+  const [userFilters, setUserFilters] = useState({
+    email: "",
+    name: "",
+    role: "",
+    isActive: "",
+    sort: "",
+  });
+
+  // Class filters and search
+  const [classFilters, setClassFilters] = useState({
+    year: "",
+    grade: "",
+    isAvailable: "",
+    teacherId: "",
+    sort: "",
+  });
+  const [classPagination, setClassPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalClasses: 0,
+    limit: 10,
+  });
+
+  // Teachers for filter dropdown
+  const [allTeachers, setAllTeachers] = useState([]);
+
   // New states for available teachers and students
   const [availableTeachers, setAvailableTeachers] = useState([]);
   const [availableStudents, setAvailableStudents] = useState([]);
@@ -96,6 +123,7 @@ function AdminDashboard({ user, onLogout }) {
   const [parents, setParents] = useState([]);
   const [students, setStudents] = useState([]);
   const [allClasses, setAllClasses] = useState([]);
+  const [formKey, setFormKey] = useState(0); // Force form re-render
 
   // Load data based on active tab
   useEffect(() => {
@@ -103,11 +131,12 @@ function AdminDashboard({ user, onLogout }) {
       loadUsers();
     } else if (activeTab === "classes") {
       loadClasses();
+      loadAllTeachers(); // Load teachers for filter dropdown
     } else {
       // Clear error when switching away from data tabs
       setError("");
     }
-  }, [activeTab, pagination.currentPage, selectedRole]);
+  }, [activeTab, pagination.currentPage, selectedRole, userFilters, classPagination.currentPage, classFilters]);
 
   const loadUsers = async () => {
     if (!user?.token) return;
@@ -117,9 +146,26 @@ function AdminDashboard({ user, onLogout }) {
 
     try {
       const filters = {};
+      
+      // Combine selectedRole with userFilters
       if (selectedRole !== "all") {
-        filters.role =
-          selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
+        filters.role = selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
+      } else if (userFilters.role) {
+        filters.role = userFilters.role;
+      }
+      
+      // Add search and filter parameters
+      if (userFilters.email.trim()) {
+        filters.email = userFilters.email.trim();
+      }
+      if (userFilters.name.trim()) {
+        filters.name = userFilters.name.trim();
+      }
+      if (userFilters.isActive !== "") {
+        filters.isActive = userFilters.isActive;
+      }
+      if (userFilters.sort) {
+        filters.sort = userFilters.sort;
       }
 
       const response = await apiService.getUsers(
@@ -134,28 +180,77 @@ function AdminDashboard({ user, onLogout }) {
         console.log("📋 Raw user data from API:", response.data[0]); // Log first user to see structure
 
         // Map the API response to match the UI structure
-        const mappedUsers = response.data.map((user) => ({
-          id: user._id || user.id,
-          // Use roleId from backend if available, otherwise fallback to _id
-          roleId: user.roleId || user._id || user.id,
-          name: user.name || user.userId?.name || "Chưa có tên",
-          email: user.email || user.userId?.email || "Chưa có email",
-          phone:
-            user.phoneNumber ||
-            user.phone ||
-            user.userId?.phoneNumber ||
-            "Chưa có",
-          role: (user.role || "unknown").toLowerCase(),
-          status: user.isActive ? "Đang hoạt động" : "Tạm nghỉ",
-          gender: user.gender || "",
-          address: user.address || "",
-          // Role-specific data
-          parentId: user.parentId || null,
-          classId: user.classId || null,
-          childId: user.childId || [],
-          canSeeTeacher: user.canSeeTeacher || false,
-          wagePerLesson: user.wagePerLesson || 0,
-        }));
+        const mappedUsers = response.data.map((user) => {
+          // Xác định roleId dựa trên vai trò người dùng
+          let roleId = null;
+
+          // Nếu API trả về trường roleId rõ ràng, ưu tiên sử dụng trước
+          if (user.roleId) {
+            roleId = user.roleId;
+          }
+          // Nếu không có roleId, xác định dựa trên vai trò
+          else if (user.role) {
+            if (user.role.toLowerCase() === "teacher") {
+              // Nếu là giáo viên, tìm kiếm trong dữ liệu teacherId
+              if (user.teacherId) {
+                if (typeof user.teacherId === "object") {
+                  roleId = user.teacherId._id;
+                } else {
+                  roleId = user.teacherId;
+                }
+              }
+            } else if (user.role.toLowerCase() === "student") {
+              // Nếu là học sinh, tìm kiếm trong dữ liệu studentId
+              if (user.studentId) {
+                if (typeof user.studentId === "object") {
+                  roleId = user.studentId._id;
+                } else {
+                  roleId = user.studentId;
+                }
+              }
+            } else if (user.role.toLowerCase() === "parent") {
+              // Nếu là phụ huynh, tìm kiếm trong dữ liệu parentId
+              if (user.parentId) {
+                if (typeof user.parentId === "object") {
+                  roleId = user.parentId._id;
+                } else {
+                  roleId = user.parentId;
+                }
+              }
+            }
+          }
+
+          // Nếu vẫn chưa có roleId, đánh dấu là null - không sử dụng ID chính làm fallback nữa
+          // vì điều này có thể gây ra lỗi khi gọi API
+
+          console.log(
+            `User ${user.name || user.userId?.name} (${
+              user.role
+            }) has roleId: ${roleId || "NOT_FOUND"}`
+          );
+
+          return {
+            id: user._id || user.id,
+            roleId: roleId, // Có thể null
+            name: user.name || user.userId?.name || "Chưa có tên",
+            email: user.email || user.userId?.email || "Chưa có email",
+            phone:
+              user.phoneNumber ||
+              user.phone ||
+              user.userId?.phoneNumber ||
+              "Chưa có",
+            role: (user.role || "unknown").toLowerCase(),
+            status: user.isActive ? "Đang hoạt động" : "Ngừng hoạt động",
+            gender: user.gender || "",
+            address: user.address || "",
+            // Role-specific data theo model
+            parentId: user.parentId || null,
+            classId: user.classId || [], // Teacher/Student có classId array
+            childId: user.childId || [], // Parent có childId array
+            canSeeTeacher: user.canSeeTeacher || false, // Parent có canSeeTeacher
+            wagePerLesson: user.wagePerLesson || 0, // Teacher có wagePerLesson
+          };
+        });
 
         console.log("🔄 Mapped user data:", mappedUsers[0]); // Log mapped data
 
@@ -185,10 +280,31 @@ function AdminDashboard({ user, onLogout }) {
     setError("");
 
     try {
-      const filters = {};
-      // Add filters if needed
+      const filters = { summary: "true" }; // Always get summary for list view
+      
+      // Add search and filter parameters
+      if (classFilters.year) {
+        filters.year = classFilters.year;
+      }
+      if (classFilters.grade) {
+        filters.grade = classFilters.grade;
+      }
+      if (classFilters.isAvailable !== "") {
+        filters.isAvailable = classFilters.isAvailable;
+      }
+      if (classFilters.teacherId) {
+        filters.teacherId = classFilters.teacherId;
+      }
+      if (classFilters.sort) {
+        filters.sort = classFilters.sort;
+      }
 
-      const response = await apiService.getClasses(user.token, 1, 100, filters);
+      const response = await apiService.getClasses(
+        user.token, 
+        classPagination.currentPage, 
+        classPagination.limit, 
+        filters
+      );
 
       // Backend returns: {msg, data, pagination} instead of {success, classes}
       if (response.data && Array.isArray(response.data)) {
@@ -214,6 +330,15 @@ function AdminDashboard({ user, onLogout }) {
         }));
 
         setClasses(mappedClasses);
+        
+        // Update pagination for classes
+        if (response.pagination) {
+          setClassPagination((prev) => ({
+            ...prev,
+            totalPages: response.pagination.totalPages || 1,
+            totalClasses: response.pagination.totalItems || response.data.length,
+          }));
+        }
       } else {
         setError(response.msg || "Không thể tải danh sách lớp học");
       }
@@ -222,6 +347,25 @@ function AdminDashboard({ user, onLogout }) {
       setError("Lỗi kết nối. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load all teachers for filter dropdown
+  const loadAllTeachers = async () => {
+    if (!user?.token) return;
+
+    try {
+      const response = await apiService.getTeachers(user.token, 1, 100, {});
+      if (response.data && Array.isArray(response.data)) {
+        const mappedTeachers = response.data.map((teacher) => ({
+          id: teacher._id || teacher.id,
+          roleId: teacher._id || teacher.id,
+          name: teacher.name || teacher.userId?.name || "Chưa có tên",
+        }));
+        setAllTeachers(mappedTeachers);
+      }
+    } catch (error) {
+      console.error("Error loading teachers for filter:", error);
     }
   };
 
@@ -397,7 +541,7 @@ function AdminDashboard({ user, onLogout }) {
         role: "teacher",
         status: "Đang hoạt động",
       },
-      // Học viên mẫu
+      // Học sinh mẫu
       {
         id: 4,
         name: "Nguyễn Văn An",
@@ -428,7 +572,7 @@ function AdminDashboard({ user, onLogout }) {
         email: "student4@gmail.com",
         phone: "0978901234",
         role: "student",
-        status: "Tạm nghỉ",
+        status: "Ngừng hoạt động",
       },
       // Phụ huynh mẫu
       {
@@ -579,7 +723,8 @@ function AdminDashboard({ user, onLogout }) {
 
   const filteredUsers = users; // Users are already filtered by the API call
 
-  const handleAddUser = () => {
+  // Helper function to reset form data
+  const resetFormData = () => {
     setFormData({
       name: "",
       email: "",
@@ -594,8 +739,13 @@ function AdminDashboard({ user, onLogout }) {
       canViewTeacher: false,
       wagePerLesson: 100000, // Thêm trường lương/buổi cho giáo viên
     });
+  };
+
+  const handleAddUser = () => {
+    resetFormData();
     setEditingUser(null);
     setError(""); // Clear any previous errors
+    setFormKey((prev) => prev + 1); // Force form re-render
     setShowAddUserForm(true);
   };
 
@@ -610,12 +760,33 @@ function AdminDashboard({ user, onLogout }) {
     setError("");
 
     try {
+      // Lấy đúng roleId - đây là ID của bản ghi trong bảng tương ứng với role
+      const roleId = userSummary.roleId;
+      // User ID - là ID trong bảng users
+      const userId = userSummary.id;
+
+      console.log(
+        `🔍 Role: ${userSummary.role}, UserID: ${userId}, RoleID: ${roleId}`
+      );
+
+      // Xác định nên sử dụng API endpoint nào
+      let useRoleSpecificEndpoint = false;
+
+      if (roleId) {
+        // Chỉ sử dụng role-specific endpoint khi có roleId
+        useRoleSpecificEndpoint = true;
+      } else {
+        console.warn(
+          "⚠️ Missing roleId for user, will use general user endpoint"
+        );
+      }
+
       // Gọi API để lấy thông tin chi tiết của user
       const response = await apiService.getUserById(
         user.token,
-        userSummary.id,
-        userSummary.role,
-        userSummary.roleId // Truyền roleId nếu có
+        userId,
+        useRoleSpecificEndpoint ? userSummary.role : null,
+        roleId // Truyền roleId nếu có
       );
 
       if (response.success && response.data) {
@@ -662,56 +833,123 @@ function AdminDashboard({ user, onLogout }) {
     setShowAddUserForm(true);
 
     try {
+      // Lấy đúng roleId - đây là ID của bản ghi trong bảng tương ứng với role
+      const roleId = userSummary.roleId;
+      // User ID - là ID trong bảng users
+      const userId = userSummary.id;
+
+      console.log(
+        `🔍 Edit user - Role: ${userSummary.role}, UserID: ${userId}, RoleID: ${roleId}`
+      );
+
+      // Xác định nên sử dụng API endpoint nào
+      let useRoleSpecificEndpoint = false;
+
+      if (roleId) {
+        // Chỉ sử dụng role-specific endpoint khi có roleId
+        useRoleSpecificEndpoint = true;
+      } else {
+        console.warn(
+          "⚠️ Missing roleId for user, will use general user endpoint"
+        );
+      }
+
       // Gọi API để lấy thông tin chi tiết của user
       const response = await apiService.getUserById(
         user.token,
-        userSummary.id,
-        userSummary.role,
-        userSummary.roleId // Truyền roleId nếu có
+        userId,
+        useRoleSpecificEndpoint ? userSummary.role : null,
+        roleId // Truyền roleId nếu có
       );
 
       if (response.success && response.data) {
         // Cập nhật form data với thông tin chi tiết từ API
         const userData = response.data;
-        
+
+        console.log("🔍 Raw userData from API for editing:", userData);
+        console.log("🔍 User role:", userSummary.role);
+
         // Extract class IDs from various possible formats
         let classIds = [];
-        if (userData.currentClasses && Array.isArray(userData.currentClasses)) {
-          classIds = userData.currentClasses.map(cls => {
+
+        // Cho Teacher và Student: kiểm tra trường classId (theo model)
+        if (userData.classId && Array.isArray(userData.classId)) {
+          classIds = userData.classId.map((cls) => {
+            return cls._id || cls.id || cls;
+          });
+        } else if (
+          userData.currentClasses &&
+          Array.isArray(userData.currentClasses)
+        ) {
+          // Fallback cho trường hợp API trả về currentClasses
+          classIds = userData.currentClasses.map((cls) => {
             return cls._id || cls.id || cls;
           });
         } else if (userData.classIds && Array.isArray(userData.classIds)) {
+          // Fallback cho trường hợp API trả về classIds
           classIds = userData.classIds;
+        } else if (userData.classId && typeof userData.classId === "string") {
+          // Nếu classId là string đơn
+          classIds = [userData.classId];
         }
-        
-        // Extract student IDs for parent role
+
+        console.log("🔍 Debug classIds extraction:", {
+          classId: userData.classId,
+          currentClasses: userData.currentClasses,
+          classIds: userData.classIds,
+          extractedClassIds: classIds,
+        });
+
+        // Extract student IDs for parent role - theo model Parent có childId (array)
         let studentIds = [];
-        if (userData.children && Array.isArray(userData.children)) {
-          studentIds = userData.children.map(child => {
-            return child._id || child.id || child.userId?._id || child.userId?.id || child;
+
+        // Theo model Parent: trường childId chứa array các Student ID
+        if (userData.childId && Array.isArray(userData.childId)) {
+          studentIds = userData.childId.map((child) => {
+            return (
+              child._id ||
+              child.id ||
+              child.userId?._id ||
+              child.userId?.id ||
+              child
+            );
+          });
+        } else if (userData.children && Array.isArray(userData.children)) {
+          // Fallback cho trường hợp API trả về children
+          studentIds = userData.children.map((child) => {
+            return (
+              child._id ||
+              child.id ||
+              child.userId?._id ||
+              child.userId?.id ||
+              child
+            );
           });
         } else if (userData.studentIds && Array.isArray(userData.studentIds)) {
+          // Fallback cho trường hợp API trả về studentIds
           studentIds = userData.studentIds;
         }
-        
+
+        console.log("🔍 Debug studentIds extraction:", {
+          childId: userData.childId,
+          children: userData.children,
+          studentIds: userData.studentIds,
+          extractedStudentIds: studentIds,
+        });
+
         // Extract parent ID for student role
         let parentId = "";
         if (userData.parentId) {
-          parentId = userData.parentId._id || userData.parentId.id || userData.parentId;
+          parentId =
+            userData.parentId._id || userData.parentId.id || userData.parentId;
         }
 
         setFormData({
           id: userData.id || userData._id || userSummary.id,
           name:
-            userData.name ||
-            userData.userId?.name ||
-            userSummary.name ||
-            "",
+            userData.name || userData.userId?.name || userSummary.name || "",
           email:
-            userData.email ||
-            userData.userId?.email ||
-            userSummary.email ||
-            "",
+            userData.email || userData.userId?.email || userSummary.email || "",
           phone:
             userData.phone ||
             userData.phoneNumber ||
@@ -719,25 +957,20 @@ function AdminDashboard({ user, onLogout }) {
             userSummary.phone ||
             "",
           role:
-            (userData.role || userSummary.role || "")
-              .charAt(0)
-              .toUpperCase() +
-            (userData.role || userSummary.role || "")
-              .slice(1)
-              .toLowerCase(),
+            (userData.role || userSummary.role || "").charAt(0).toUpperCase() +
+            (userData.role || userSummary.role || "").slice(1).toLowerCase(),
           gender: userData.gender || userSummary.gender || "",
           address: userData.address || userSummary.address || "",
           passwordBeforeHash: "", // Không lấy password từ API
           classIds: classIds,
           studentIds: studentIds,
           parentId: parentId,
+          // Mapping dữ liệu vào formData theo UI format (thống nhất)
           canViewTeacher:
-            userData.canViewTeacher ||
-            userData.canSeeTeacher ||
-            false,
-          wagePerLesson: userData.wagePerLesson || 100000, // Thêm lương/buổi từ API
+            userData.canViewTeacher || userData.canSeeTeacher || false, // UI dùng canViewTeacher, model dùng canSeeTeacher
+          wagePerLesson: userData.wagePerLesson || 100000, // Teacher có wagePerLesson
         });
-        
+
         // Preserve roleId from userSummary in editingUser
         setEditingUser({
           ...userData,
@@ -746,13 +979,22 @@ function AdminDashboard({ user, onLogout }) {
           name: userData.name || userData.userId?.name || userSummary.name,
         });
         setError(""); // Clear any previous errors
-        
+
         console.log("📝 Form data loaded for editing:", {
           name: userData.name || userData.userId?.name || userSummary.name,
           role: userSummary.role,
           classIds: classIds,
           studentIds: studentIds,
-          parentId: parentId
+          parentId: parentId,
+          rawUserData: userData, // Thêm raw data để debug
+          finalFormData: {
+            classIds: classIds,
+            studentIds: studentIds,
+            parentId: parentId,
+            canViewTeacher:
+              userData.canViewTeacher || userData.canSeeTeacher || false,
+            wagePerLesson: userData.wagePerLesson || 100000,
+          },
         });
       } else {
         // Fallback to summary data if API fails
@@ -870,59 +1112,64 @@ function AdminDashboard({ user, onLogout }) {
         const updateData = {
           name: formData.name,
           email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
           gender: formData.gender,
           address: formData.address,
         };
 
-        // Thêm các trường theo role
+        // Convert phone -> phoneNumber để phù hợp với User model
+        if (formData.phone) {
+          updateData.phoneNumber = formData.phone;
+          console.log("📱 Converting phone → phoneNumber:", formData.phone);
+        }
+
+        // Thêm các trường theo role và convert field names theo model
         if (formData.role === "Parent") {
-          updateData.canSeeTeacher = formData.canViewTeacher; // Sửa tên field cho backend
+          updateData.canSeeTeacher = formData.canViewTeacher; // Theo model Parent
+
+          // Convert studentIds thành childId cho Parent
+          if (formData.studentIds && formData.studentIds.length > 0) {
+            const studentRoleIds = formData.studentIds.map((userId) => {
+              const student = students.find((s) => s.id === userId);
+              return student ? student.roleId : userId;
+            });
+            updateData.childId = studentRoleIds; // Theo model Parent: childId array
+            console.log(
+              "👶 Parent childId converted:",
+              formData.studentIds,
+              "→",
+              studentRoleIds
+            );
+          }
         }
 
         if (formData.role === "Teacher") {
-          updateData.wagePerLesson = formData.wagePerLesson; // Thêm lương/buổi cho giáo viên
+          updateData.wagePerLesson = formData.wagePerLesson; // Theo model Teacher
+
+          // Convert classIds thành classId cho Teacher
+          if (formData.classIds && formData.classIds.length > 0) {
+            updateData.classId = formData.classIds; // Theo model Teacher: classId array
+            console.log("🏫 Teacher classId converted:", formData.classIds);
+          }
         }
 
-        // Convert User IDs to Role IDs for relationships
-        if (formData.classIds && formData.classIds.length > 0) {
-          updateData.classIds = formData.classIds; // Class IDs should be correct already
-        }
+        if (formData.role === "Student") {
+          // Convert classIds thành classId cho Student
+          if (formData.classIds && formData.classIds.length > 0) {
+            updateData.classId = formData.classIds; // Theo model Student: classId array
+            console.log("📚 Student classId converted:", formData.classIds);
+          }
 
-        if (formData.studentIds && formData.studentIds.length > 0) {
-          // Convert User IDs to Student Role IDs
-          const studentRoleIds = formData.studentIds.map((userId) => {
-            const student = students.find((s) => s.id === userId);
+          // Convert parentId cho Student
+          if (formData.parentId) {
+            const parent = parents.find((p) => p.id === formData.parentId);
+            updateData.parentId = parent ? parent.roleId : formData.parentId; // Theo model Student: parentId
             console.log(
-              `Converting student ${userId} to roleId:`,
-              student?.roleId
+              "👨‍👩‍👧‍👦 Student parentId converted:",
+              formData.parentId,
+              "→",
+              updateData.parentId
             );
-            return student ? student.roleId : userId;
-          });
-          updateData.studentIds = studentRoleIds;
-          console.log(
-            "📋 Student IDs converted:",
-            formData.studentIds,
-            "→",
-            studentRoleIds
-          );
-        }
-
-        if (formData.parentId) {
-          // Convert User ID to Parent Role ID
-          const parent = parents.find((p) => p.id === formData.parentId);
-          console.log(
-            `Converting parent ${formData.parentId} to roleId:`,
-            parent?.roleId
-          );
-          updateData.parentId = parent ? parent.roleId : formData.parentId;
-          console.log(
-            "👨‍👩‍👧‍👦 Parent ID converted:",
-            formData.parentId,
-            "→",
-            updateData.parentId
-          );
+          }
         }
 
         // Chỉ thêm password nếu người dùng nhập mới
@@ -958,50 +1205,71 @@ function AdminDashboard({ user, onLogout }) {
         // Tạo user mới - cũng cần convert IDs
         const createData = { ...formData };
 
-        // Thêm các trường theo role cho user mới
+        // Convert phone -> phoneNumber để phù hợp với User model
+        if (createData.phone) {
+          createData.phoneNumber = createData.phone;
+          delete createData.phone; // Xóa field cũ
+          console.log("📱 Converting phone → phoneNumber:", formData.phone);
+        }
+
+        // Thêm các trường theo role cho user mới và convert field names theo model
         if (createData.role === "Parent") {
-          createData.canSeeTeacher = createData.canViewTeacher; // Sửa tên field cho backend
+          createData.canSeeTeacher = createData.canViewTeacher; // Theo model Parent
           delete createData.canViewTeacher; // Xóa field không cần thiết
+
+          // Convert studentIds thành childId cho Parent
+          if (createData.studentIds && createData.studentIds.length > 0) {
+            const studentRoleIds = createData.studentIds.map((userId) => {
+              const student = students.find((s) => s.id === userId);
+              return student ? student.roleId : userId;
+            });
+            createData.childId = studentRoleIds; // Theo model Parent: childId array
+            delete createData.studentIds; // Xóa field cũ
+            console.log(
+              "👶 New Parent childId converted:",
+              formData.studentIds,
+              "→",
+              studentRoleIds
+            );
+          }
         }
 
         if (createData.role === "Teacher") {
-          createData.wagePerLesson = createData.wagePerLesson || 100000; // Đảm bảo có lương mặc định
+          createData.wagePerLesson = createData.wagePerLesson || 100000; // Theo model Teacher
+
+          // Convert classIds thành classId cho Teacher
+          if (createData.classIds && createData.classIds.length > 0) {
+            createData.classId = createData.classIds; // Theo model Teacher: classId array
+            delete createData.classIds; // Xóa field cũ
+            console.log("🏫 New Teacher classId converted:", formData.classIds);
+          }
         }
 
-        // Convert User IDs to Role IDs for relationships
-        if (createData.studentIds && createData.studentIds.length > 0) {
-          const studentRoleIds = createData.studentIds.map((userId) => {
-            const student = students.find((s) => s.id === userId);
+        if (createData.role === "Student") {
+          // Convert classIds thành classId cho Student
+          if (createData.classIds && createData.classIds.length > 0) {
+            createData.classId = createData.classIds; // Theo model Student: classId array
+            delete createData.classIds; // Xóa field cũ
+            console.log("📚 New Student classId converted:", formData.classIds);
+          }
+
+          // Convert parentId cho Student
+          if (createData.parentId) {
+            const parent = parents.find((p) => p.id === createData.parentId);
+            createData.parentId = parent ? parent.roleId : createData.parentId; // Theo model Student: parentId
             console.log(
-              `Converting student ${userId} to roleId:`,
-              student?.roleId
+              "👨‍👩‍👧‍👦 New Student parentId converted:",
+              formData.parentId,
+              "→",
+              createData.parentId
             );
-            return student ? student.roleId : userId;
-          });
-          createData.studentIds = studentRoleIds;
-          console.log(
-            "📋 Student IDs converted for new user:",
-            formData.studentIds,
-            "→",
-            studentRoleIds
-          );
+          }
         }
 
-        if (createData.parentId) {
-          const parent = parents.find((p) => p.id === createData.parentId);
-          console.log(
-            `Converting parent ${createData.parentId} to roleId:`,
-            parent?.roleId
-          );
-          createData.parentId = parent ? parent.roleId : createData.parentId;
-          console.log(
-            "👨‍👩‍👧‍👦 Parent ID converted for new user:",
-            formData.parentId,
-            "→",
-            createData.parentId
-          );
-        }
-
+        console.log(
+          `🆕 Creating new ${createData.role} with data:`,
+          createData
+        );
         response = await apiService.createUser(user.token, createData);
       }
 
@@ -1042,6 +1310,18 @@ function AdminDashboard({ user, onLogout }) {
       setFormData((prev) => ({
         ...prev,
         canViewTeacher: value === "true",
+      }));
+    } else if (name === "role") {
+      // When role changes, clear role-specific fields
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+        // Clear parent selection if not a student
+        parentId: value === "Student" ? prev.parentId : "",
+        // Clear student IDs if not a parent
+        studentIds: value === "Parent" ? prev.studentIds : [],
+        // Clear wage if not a teacher
+        wagePerLesson: value === "Teacher" ? prev.wagePerLesson : 100000,
       }));
     } else {
       setFormData((prev) => ({
@@ -1147,7 +1427,7 @@ function AdminDashboard({ user, onLogout }) {
   };
 
   const handleRemoveStudent = (studentId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa học viên này khỏi lớp?")) {
+    if (window.confirm("Bạn có chắc chắn muốn xóa học sinh này khỏi lớp?")) {
       setEditClassData((prev) => ({
         ...prev,
         students: prev.students.filter((student) => student.id !== studentId),
@@ -1160,7 +1440,7 @@ function AdminDashboard({ user, onLogout }) {
   // const handleSaveStudentChanges = (studentId) => {
   //   // You can implement API call here to save student changes if needed
   //   // For now, just show a notification or log
-  //   alert('Đã lưu thay đổi cho học viên!');
+  //   alert('Đã lưu thay đổi cho học sinh!');
   // }
 
   const handleSaveClass = () => {
@@ -1293,7 +1573,15 @@ function AdminDashboard({ user, onLogout }) {
           name: parent.name || parent.userId?.name || "Chưa có tên",
           email: parent.email || parent.userId?.email || "Chưa có email",
         }));
+        console.log("👨‍👩‍👧‍👦 Parents loaded for form:", {
+          rawData: parentsRes.data,
+          mappedParents,
+          count: mappedParents.length,
+        });
         setParents(mappedParents);
+      } else {
+        console.log("⚠️ No parents data received:", parentsRes);
+        setParents([]);
       }
 
       if (studentsRes.data) {
@@ -1312,6 +1600,11 @@ function AdminDashboard({ user, onLogout }) {
           className: cls.className || cls.name || "Chưa có tên lớp",
         }));
         setAllClasses(mappedClasses);
+        console.log(
+          "🏫 Classes loaded for form:",
+          mappedClasses.length,
+          mappedClasses
+        );
       }
     } catch (err) {
       console.error("Failed to load form data", err);
@@ -1406,7 +1699,7 @@ function AdminDashboard({ user, onLogout }) {
               user.userId?.phoneNumber ||
               "Chưa có",
             role: (user.role || "unknown").toLowerCase(),
-            status: user.isActive ? "Đang hoạt động" : "Tạm nghỉ",
+            status: user.isActive ? "Đang hoạt động" : "Ngừng hoạt động",
             gender: user.gender || "",
             address: user.address || "",
             parentId: user.parentId || null,
@@ -1578,7 +1871,7 @@ function AdminDashboard({ user, onLogout }) {
                   <div className="card-content">
                     <h3>
                       <FiUsers className="icon" style={{ color: "#b30000" }} />
-                      Tổng số học viên
+                      Tổng số học sinh
                     </h3>
                     <p
                       className="stat"
@@ -1600,7 +1893,7 @@ function AdminDashboard({ user, onLogout }) {
                         margin: "0",
                       }}
                     >
-                      Học viên đang theo học
+                      Học sinh đang theo học
                     </p>
                   </div>
                   <div
@@ -2011,6 +2304,7 @@ function AdminDashboard({ user, onLogout }) {
                 className="filter-section"
                 style={{
                   display: "flex",
+                  flexWrap: "wrap",
                   alignItems: "center",
                   gap: "1rem",
                   marginBottom: "1.5rem",
@@ -2022,6 +2316,97 @@ function AdminDashboard({ user, onLogout }) {
                   border: "1px solid #e5e7eb",
                 }}
               >
+                {/* Search by Name */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    minWidth: "200px",
+                  }}
+                >
+                  <FiUser style={{ color: "#6b7280" }} />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên..."
+                    value={userFilters.name}
+                    onChange={(e) =>
+                      setUserFilters(prev => ({ ...prev, name: e.target.value }))
+                    }
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "0.375rem",
+                      fontSize: "0.875rem",
+                      flex: 1,
+                    }}
+                  />
+                </div>
+
+                {/* Search by Email */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    minWidth: "200px",
+                  }}
+                >
+                  <FiMail style={{ color: "#6b7280" }} />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo email..."
+                    value={userFilters.email}
+                    onChange={(e) =>
+                      setUserFilters(prev => ({ ...prev, email: e.target.value }))
+                    }
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "0.375rem",
+                      fontSize: "0.875rem",
+                      flex: 1,
+                    }}
+                  />
+                </div>
+
+                {/* Filter by Active Status */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontWeight: "500",
+                      color: "#374151",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    Trạng thái:
+                  </label>
+                  <select
+                    value={userFilters.isActive}
+                    onChange={(e) =>
+                      setUserFilters(prev => ({ ...prev, isActive: e.target.value }))
+                    }
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "0.375rem",
+                      backgroundColor: "white",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="true">Đang hoạt động</option>
+                    <option value="false">Ngừng hoạt động</option>
+                  </select>
+                </div>
+
+                {/* Role Filter */}
                 <div
                   style={{
                     display: "flex",
@@ -2062,7 +2447,7 @@ function AdminDashboard({ user, onLogout }) {
                 >
                   <option value="all">Tất cả</option>
                   <option value="teacher">Giáo viên</option>
-                  <option value="student">Học viên</option>
+                  <option value="student">Học sinh</option>
                   <option value="parent">Phụ huynh</option>
                 </select>
 
@@ -2133,12 +2518,16 @@ function AdminDashboard({ user, onLogout }) {
 
                       <div className="user-edit-avatar">
                         {editingUser
-                          ? (formData.name || editingUser.name || "U").charAt(0).toUpperCase()
+                          ? (formData.name || editingUser.name || "U")
+                              .charAt(0)
+                              .toUpperCase()
                           : "+"}
                       </div>
                       <h2 className="user-edit-name">
                         {editingUser
-                          ? `Chỉnh sửa: ${formData.name || editingUser.name || "Người dùng"}`
+                          ? `Chỉnh sửa: ${
+                              formData.name || editingUser.name || "Người dùng"
+                            }`
                           : "Thêm người dùng mới"}
                       </h2>
                       <div className="user-edit-role">
@@ -2148,7 +2537,7 @@ function AdminDashboard({ user, onLogout }) {
                             case "teacher":
                               return "Giáo viên";
                             case "student":
-                              return "Học viên";
+                              return "Học sinh";
                             case "parent":
                               return "Phụ huynh";
                             case "admin":
@@ -2185,7 +2574,11 @@ function AdminDashboard({ user, onLogout }) {
                           {error}
                         </div>
                       ) : (
-                        <form onSubmit={handleFormSubmit}>
+                        <form
+                          key={formKey}
+                          onSubmit={handleFormSubmit}
+                          autoComplete="off"
+                        >
                           {/* Thông tin cơ bản */}
                           <div className="user-edit-section">
                             <h3>
@@ -2204,6 +2597,8 @@ function AdminDashboard({ user, onLogout }) {
                                 value={formData.name}
                                 onChange={handleInputChange}
                                 placeholder="Nhập họ và tên"
+                                autoComplete="off"
+                                data-lpignore="true"
                                 required
                               />
                             </div>
@@ -2217,6 +2612,9 @@ function AdminDashboard({ user, onLogout }) {
                                 value={formData.email}
                                 onChange={handleInputChange}
                                 placeholder="Nhập địa chỉ email"
+                                autoComplete="new-email"
+                                autoFill="off"
+                                data-lpignore="true"
                                 required
                               />
                             </div>
@@ -2284,7 +2682,7 @@ function AdminDashboard({ user, onLogout }) {
                                 required
                                 disabled={editingUser} // Không cho đổi role khi edit
                               >
-                                <option value="Student">Học viên</option>
+                                <option value="Student">Học sinh</option>
                                 <option value="Teacher">Giáo viên</option>
                                 <option value="Parent">Phụ huynh</option>
                               </select>
@@ -2312,7 +2710,14 @@ function AdminDashboard({ user, onLogout }) {
                                 name="passwordBeforeHash"
                                 value={formData.passwordBeforeHash}
                                 onChange={handleInputChange}
-                                placeholder="••••••••••"
+                                placeholder={
+                                  editingUser
+                                    ? "Để trống để giữ nguyên mật khẩu"
+                                    : "Nhập mật khẩu"
+                                }
+                                autoComplete="new-password"
+                                autoFill="off"
+                                data-lpignore="true"
                                 minLength="8"
                                 {...(editingUser ? {} : { required: true })}
                               />
@@ -2336,19 +2741,23 @@ function AdminDashboard({ user, onLogout }) {
                             <div className="user-edit-section">
                               <h3>
                                 <HiAcademicCap />
-                                Thông tin học viên
+                                Thông tin học sinh
                               </h3>
 
                               <div className="user-edit-field">
                                 <label className="user-edit-label">
                                   Phụ huynh hiện tại
                                 </label>
-                                
+
                                 {/* Hiển thị phụ huynh hiện tại nếu có */}
                                 {formData.parentId ? (
                                   <div style={{ marginBottom: "0.5rem" }}>
                                     {(() => {
-                                      const currentParent = parents.find(p => p.id === formData.parentId);
+                                      const currentParent = parents.find(
+                                        (p) =>
+                                          p.id === formData.parentId ||
+                                          p.roleId === formData.parentId
+                                      );
                                       if (currentParent) {
                                         return (
                                           <span
@@ -2366,7 +2775,12 @@ function AdminDashboard({ user, onLogout }) {
                                             Phụ huynh: {currentParent.name}
                                             <button
                                               type="button"
-                                              onClick={() => setFormData(prev => ({...prev, parentId: ""}))}
+                                              onClick={() =>
+                                                setFormData((prev) => ({
+                                                  ...prev,
+                                                  parentId: "",
+                                                }))
+                                              }
                                               style={{
                                                 background: "none",
                                                 border: "none",
@@ -2394,10 +2808,16 @@ function AdminDashboard({ user, onLogout }) {
                                               fontSize: "0.75rem",
                                             }}
                                           >
-                                            Phụ huynh: ID {formData.parentId} (không tìm thấy)
+                                            Phụ huynh: ID {formData.parentId}{" "}
+                                            (không tìm thấy)
                                             <button
                                               type="button"
-                                              onClick={() => setFormData(prev => ({...prev, parentId: ""}))}
+                                              onClick={() =>
+                                                setFormData((prev) => ({
+                                                  ...prev,
+                                                  parentId: "",
+                                                }))
+                                              }
                                               style={{
                                                 background: "none",
                                                 border: "none",
@@ -2415,34 +2835,74 @@ function AdminDashboard({ user, onLogout }) {
                                     })()}
                                   </div>
                                 ) : (
-                                  <div style={{ 
-                                    padding: "0.5rem", 
-                                    background: "#f9fafb", 
-                                    borderRadius: "4px", 
-                                    fontSize: "0.75rem", 
-                                    color: "#6b7280",
-                                    marginBottom: "0.5rem"
-                                  }}>
+                                  <div
+                                    style={{
+                                      padding: "0.5rem",
+                                      background: "#f9fafb",
+                                      borderRadius: "4px",
+                                      fontSize: "0.75rem",
+                                      color: "#6b7280",
+                                      marginBottom: "0.5rem",
+                                    }}
+                                  >
                                     Chưa có phụ huynh
                                   </div>
                                 )}
-                                
+
                                 <select
                                   className="user-edit-select"
                                   onChange={(e) => {
-                                    if (e.target.value) {
-                                      setFormData(prev => ({...prev, parentId: e.target.value}));
-                                      e.target.value = ""; // Reset select
+                                    const selectedParentId = e.target.value;
+                                    console.log(
+                                      "🔍 Parent dropdown selection:",
+                                      {
+                                        selectedParentId,
+                                        currentParentId: formData.parentId,
+                                        allParents: parents,
+                                        parentsCount: parents.length,
+                                      }
+                                    );
+                                    if (
+                                      selectedParentId &&
+                                      selectedParentId !== ""
+                                    ) {
+                                      console.log(
+                                        "✅ Setting parent ID:",
+                                        selectedParentId
+                                      );
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        parentId: selectedParentId,
+                                      }));
                                     }
                                   }}
                                   value=""
+                                  style={{
+                                    width: "100%",
+                                    padding: "0.75rem",
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: "8px",
+                                    fontSize: "0.875rem",
+                                  }}
                                 >
-                                  <option value="">Chọn phụ huynh để thay đổi</option>
+                                  <option value="">
+                                    {parents.length > 0
+                                      ? "Chọn phụ huynh"
+                                      : "Không có phụ huynh nào"}
+                                  </option>
                                   {parents
-                                    .filter(p => p.id !== formData.parentId)
+                                    .filter(
+                                      (p) =>
+                                        p.roleId !== formData.parentId &&
+                                        p.id !== formData.parentId
+                                    )
                                     .map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.name} (ID: {p.id.slice(-6)})
+                                      <option
+                                        key={p.roleId || p.id}
+                                        value={p.roleId}
+                                      >
+                                        {p.name} (ID:{" "}
+                                        {(p.id || p.roleId).slice(-6)})
                                       </option>
                                     ))}
                                 </select>
@@ -2450,133 +2910,26 @@ function AdminDashboard({ user, onLogout }) {
 
                               <div className="user-edit-field">
                                 <label className="user-edit-label">
-                                  Lớp học đang tham gia
+                                  Lớp học
                                 </label>
-                                
-                                {/* Hiển thị lớp học hiện tại nếu có */}
-                                {formData.classIds.length > 0 ? (
-                                  <div style={{ marginBottom: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                                    {formData.classIds.map((id) => {
-                                      const classItem = allClasses.find(
-                                        (c) => c.id === id || c._id === id
-                                      );
-                                      return (
-                                        <span
-                                          key={id}
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.25rem",
-                                            padding: "0.25rem 0.5rem",
-                                            background: classItem ? "#e0f2fe" : "#fef3c7",
-                                            color: classItem ? "#0c4a6e" : "#92400e",
-                                            borderRadius: "4px",
-                                            fontSize: "0.75rem",
-                                          }}
-                                        >
-                                          {classItem ? classItem.className || classItem.name : `Lớp ID: ${id} (không tìm thấy)`}
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleRemoveClass(id)
-                                            }
-                                            style={{
-                                              background: "none",
-                                              border: "none",
-                                              color: classItem ? "#0c4a6e" : "#92400e",
-                                              cursor: "pointer",
-                                              padding: "0",
-                                              marginLeft: "0.25rem",
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <div style={{ 
-                                    padding: "0.5rem", 
-                                    background: "#f9fafb", 
-                                    borderRadius: "4px", 
-                                    fontSize: "0.75rem", 
-                                    color: "#6b7280",
-                                    marginBottom: "0.5rem"
-                                  }}>
-                                    Chưa tham gia lớp học nào
-                                  </div>
-                                )}
-                                
-                                <select
-                                  className="user-edit-select"
-                                  onChange={(e) =>
-                                    handleClassSelect(e.target.value)
-                                  }
-                                  value=""
+                                <div
+                                  style={{
+                                    padding: "0.75rem",
+                                    background: "#f0f9ff",
+                                    border: "1px solid #0ea5e9",
+                                    borderRadius: "8px",
+                                    fontSize: "0.875rem",
+                                    color: "#0c4a6e",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.5rem",
+                                  }}
                                 >
-                                  <option value="">Chọn lớp học để thêm</option>
-                                  {allClasses
-                                    .filter(
-                                      (c) => !formData.classIds.includes(c.id)
-                                    )
-                                    .map((c) => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.className}
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-
-                                {formData.classIds.length > 0 && (
-                                  <div
-                                    style={{
-                                      marginTop: "0.5rem",
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      gap: "0.5rem",
-                                    }}
-                                  >
-                                    {formData.classIds.map((id) => {
-                                      const classItem = allClasses.find(
-                                        (c) => c.id === id || c._id === id
-                                      );
-                                      return (
-                                        <span
-                                          key={id}
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.25rem",
-                                            padding: "0.25rem 0.5rem",
-                                            background: classItem ? "#e0f2fe" : "#fef3c7",
-                                            color: classItem ? "#0c4a6e" : "#92400e",
-                                            borderRadius: "4px",
-                                            fontSize: "0.75rem",
-                                          }}
-                                        >
-                                          {classItem ? classItem.className || classItem.name : `Lớp ID: ${id} (không tìm thấy)`}
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleRemoveClass(id)
-                                            }
-                                            style={{
-                                              background: "none",
-                                              border: "none",
-                                              color: classItem ? "#0c4a6e" : "#92400e",
-                                              cursor: "pointer",
-                                              padding: "0",
-                                              marginLeft: "0.25rem",
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                                  <HiInformationCircle style={{ fontSize: "1.25rem", color: "#0ea5e9" }} />
+                                  <span>
+                                    Vui lòng tạo học sinh trước, sau đó thêm vào lớp học ở mục "Lớp học"
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -2651,6 +3004,13 @@ function AdminDashboard({ user, onLogout }) {
                                     }}
                                   >
                                     {formData.classIds.map((id) => {
+                                      // Debug thông tin cho Teacher form
+                                      if (allClasses.length === 0) {
+                                        console.log(
+                                          "⚠️ allClasses is empty for Teacher form"
+                                        );
+                                      }
+
                                       const classItem = allClasses.find(
                                         (c) => c.id === id || c._id === id
                                       );
@@ -2662,13 +3022,20 @@ function AdminDashboard({ user, onLogout }) {
                                             alignItems: "center",
                                             gap: "0.25rem",
                                             padding: "0.25rem 0.5rem",
-                                            background: classItem ? "#fef3c7" : "#fee2e2",
-                                            color: classItem ? "#92400e" : "#dc2626",
+                                            background: classItem
+                                              ? "#fef3c7"
+                                              : "#fee2e2",
+                                            color: classItem
+                                              ? "#92400e"
+                                              : "#dc2626",
                                             borderRadius: "4px",
                                             fontSize: "0.75rem",
                                           }}
                                         >
-                                          {classItem ? classItem.className || classItem.name : `Lớp ID: ${id} (không tìm thấy)`}
+                                          {classItem
+                                            ? classItem.className ||
+                                              classItem.name
+                                            : `Lớp ID: ${id} (không tìm thấy)`}
                                           <button
                                             type="button"
                                             onClick={() =>
@@ -2677,7 +3044,9 @@ function AdminDashboard({ user, onLogout }) {
                                             style={{
                                               background: "none",
                                               border: "none",
-                                              color: classItem ? "#92400e" : "#dc2626",
+                                              color: classItem
+                                                ? "#92400e"
+                                                : "#dc2626",
                                               cursor: "pointer",
                                               padding: "0",
                                               marginLeft: "0.25rem",
@@ -2705,13 +3074,23 @@ function AdminDashboard({ user, onLogout }) {
                                 <label className="user-edit-label">
                                   Con em đang theo học
                                 </label>
-                                
+
                                 {/* Hiển thị con em hiện tại nếu có */}
                                 {formData.studentIds.length > 0 ? (
-                                  <div style={{ marginBottom: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                                  <div
+                                    style={{
+                                      marginBottom: "0.5rem",
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      gap: "0.5rem",
+                                    }}
+                                  >
                                     {formData.studentIds.map((id) => {
                                       const student = students.find(
-                                        (s) => s.id === id || s._id === id
+                                        (s) =>
+                                          s.id === id ||
+                                          s._id === id ||
+                                          s.roleId === id
                                       );
                                       return (
                                         <span
@@ -2721,13 +3100,19 @@ function AdminDashboard({ user, onLogout }) {
                                             alignItems: "center",
                                             gap: "0.25rem",
                                             padding: "0.25rem 0.5rem",
-                                            background: student ? "#dcfce7" : "#fef3c7",
-                                            color: student ? "#166534" : "#92400e",
+                                            background: student
+                                              ? "#dcfce7"
+                                              : "#fef3c7",
+                                            color: student
+                                              ? "#166534"
+                                              : "#92400e",
                                             borderRadius: "4px",
                                             fontSize: "0.75rem",
                                           }}
                                         >
-                                          {student ? student.name : `Học viên ID: ${id} (không tìm thấy)`}
+                                          {student
+                                            ? student.name
+                                            : `Học sinh ID: ${id} (không tìm thấy)`}
                                           <button
                                             type="button"
                                             onClick={() =>
@@ -2736,7 +3121,9 @@ function AdminDashboard({ user, onLogout }) {
                                             style={{
                                               background: "none",
                                               border: "none",
-                                              color: student ? "#166534" : "#92400e",
+                                              color: student
+                                                ? "#166534"
+                                                : "#92400e",
                                               cursor: "pointer",
                                               padding: "0",
                                               marginLeft: "0.25rem",
@@ -2749,18 +3136,20 @@ function AdminDashboard({ user, onLogout }) {
                                     })}
                                   </div>
                                 ) : (
-                                  <div style={{ 
-                                    padding: "0.5rem", 
-                                    background: "#f9fafb", 
-                                    borderRadius: "4px", 
-                                    fontSize: "0.75rem", 
-                                    color: "#6b7280",
-                                    marginBottom: "0.5rem"
-                                  }}>
+                                  <div
+                                    style={{
+                                      padding: "0.5rem",
+                                      background: "#f9fafb",
+                                      borderRadius: "4px",
+                                      fontSize: "0.75rem",
+                                      color: "#6b7280",
+                                      marginBottom: "0.5rem",
+                                    }}
+                                  >
                                     Chưa có con em theo học
                                   </div>
                                 )}
-                                
+
                                 <select
                                   className="user-edit-select"
                                   onChange={(e) =>
@@ -2769,14 +3158,16 @@ function AdminDashboard({ user, onLogout }) {
                                   value=""
                                 >
                                   <option value="">
-                                    Chọn học viên để thêm
+                                    Chọn học sinh để thêm
                                   </option>
                                   {students
                                     .filter(
-                                      (s) => !formData.studentIds.includes(s.id)
+                                      (s) =>
+                                        !formData.studentIds.includes(s.id) &&
+                                        !formData.studentIds.includes(s.roleId)
                                     )
                                     .map((s) => (
-                                      <option key={s.id} value={s.id}>
+                                      <option key={s.id} value={s.roleId}>
                                         {s.name} (ID: {s.id.slice(-6)})
                                       </option>
                                     ))}
@@ -2818,9 +3209,11 @@ function AdminDashboard({ user, onLogout }) {
                           type="button"
                           className="user-edit-btn user-edit-btn-cancel"
                           onClick={() => {
+                            resetFormData();
                             setShowAddUserForm(false);
                             setEditingUser(null);
                             setError("");
+                            setFormKey((prev) => prev + 1); // Force form re-render
                           }}
                         >
                           <FiX />
@@ -3140,7 +3533,7 @@ function AdminDashboard({ user, onLogout }) {
                                 }}
                               >
                                 {user.role === "teacher" && "Giáo viên"}
-                                {user.role === "student" && "Học viên"}
+                                {user.role === "student" && "Học sinh"}
                                 {user.role === "parent" && "Phụ huynh"}
                                 {user.role === "admin" && "Quản trị viên"}
                               </span>
@@ -3160,8 +3553,8 @@ function AdminDashboard({ user, onLogout }) {
                                   borderRadius: "9999px",
                                   fontSize: "0.75rem",
                                   fontWeight: "600",
-                                  backgroundColor: "#dcfce7",
-                                  color: "#166534",
+                                  backgroundColor: user.status === "Đang hoạt động" ? "#dcfce7" : "#fee2e2",
+                                  color: user.status === "Đang hoạt động" ? "#166534" : "#dc2626",
                                   whiteSpace: "nowrap",
                                 }}
                               >
@@ -3170,7 +3563,7 @@ function AdminDashboard({ user, onLogout }) {
                                     width: "0.5rem",
                                     height: "0.5rem",
                                     borderRadius: "50%",
-                                    backgroundColor: "#22c55e",
+                                    backgroundColor: user.status === "Đang hoạt động" ? "#22c55e" : "#ef4444",
                                   }}
                                 ></div>
                                 {user.status}
@@ -3340,10 +3733,10 @@ function AdminDashboard({ user, onLogout }) {
                                     pagination.currentPage === pageNum
                                       ? "white"
                                       : "#374151",
-                                  cursor: loading ? "not-allowed" : "pointer",
+                                  cursor: "pointer",
                                   fontSize: "0.875rem",
+                                  fontWeight: "500",
                                   transition: "all 0.2s ease",
-                                  minWidth: "2.5rem",
                                 }}
                               >
                                 {pageNum}
@@ -3357,12 +3750,14 @@ function AdminDashboard({ user, onLogout }) {
                         onClick={() =>
                           setPagination((prev) => ({
                             ...prev,
-                            currentPage: prev.currentPage + 1,
+                            currentPage: Math.min(
+                              prev.currentPage + 1,
+                              prev.totalPages
+                            ),
                           }))
                         }
                         disabled={
-                          pagination.currentPage === pagination.totalPages ||
-                          loading
+                          loading || pagination.currentPage === pagination.totalPages
                         }
                         style={{
                           padding: "0.5rem 0.75rem",
@@ -3461,6 +3856,78 @@ function AdminDashboard({ user, onLogout }) {
                     padding: "1rem",
                     backgroundColor: "#fed7d7",
                     color: "#c53030",
+                    borderRadius: "0.5rem",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              <div
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "0.75rem",
+                  boxShadow:
+                    "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+                  overflow: "hidden",
+                  border: "1px solid #e5e7eb",
+                  padding: "1.5rem",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                <h2
+                  className="section-title"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    margin: 0,
+                    fontSize: "1.5rem",
+                    fontWeight: "600",
+                    color: "#111827",
+                  }}
+                >
+                  <FiBook
+                    style={{ marginRight: "0.75rem", color: "#3b82f6" }}
+                  />
+                  Quản lý lớp học
+                </h2>
+                <div className="section-actions">
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setShowNewClassModal(true)}
+                    disabled={loading}
+                    style={{
+                      padding: "0.75rem 1.5rem",
+                      backgroundColor: "#3b82f6",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      fontWeight: "500",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                      boxShadow:
+                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+                      opacity: loading ? 0.5 : 1,
+                    }}
+                  >
+                    <FiPlus style={{ fontSize: "1rem" }} />
+                    Tạo lớp mới
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div
+                  className="error-message"
+                  style={{
+                    padding: "1rem",
+                    backgroundColor: "#fed7d7",
+                    color: "#c53030",
                     borderRadius: "0.375rem",
                     marginBottom: "1rem",
                   }}
@@ -3498,7 +3965,6 @@ function AdminDashboard({ user, onLogout }) {
                         textAlign: "center",
                         padding: "3rem",
                         color: "#6b7280",
-                        gridColumn: "1 / -1",
                         backgroundColor: "white",
                         borderRadius: "0.5rem",
                         boxShadow:
@@ -3514,23 +3980,6 @@ function AdminDashboard({ user, onLogout }) {
                       />
                       <h3 style={{ marginBottom: "0.5rem", color: "#374151" }}>
                         {error
-                          ? "Có lỗi xảy ra khi tải dữ liệu"
-                          : "Chưa có lớp học nào"}
-                      </h3>
-                      <p style={{ color: "#6b7280" }}>
-                        {error
-                          ? "Vui lòng thử lại sau"
-                          : "Hãy tạo lớp học đầu tiên để bắt đầu"}
-                      </p>
-                    </div>
-                  ) : (
-                    classes.map((classItem) => (
-                      <div
-                        key={classItem.id}
-                        className="card"
-                        style={{
-                          backgroundColor: "white",
-                          borderRadius: "0.75rem",
                           boxShadow:
                             "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
                           border: "1px solid #e5e7eb",
@@ -3644,7 +4093,7 @@ function AdminDashboard({ user, onLogout }) {
                               <span
                                 style={{ color: "#374151", fontWeight: "500" }}
                               >
-                                Học viên:
+                                Học sinh:
                               </span>
                               <span style={{ color: "#6b7280" }}>
                                 {classItem.currentStudents}/
@@ -4052,12 +4501,12 @@ function AdminDashboard({ user, onLogout }) {
                                         className={`status-badge ${
                                           student.isActive
                                             ? "success"
-                                            : "warning"
+                                            : "danger"
                                         }`}
                                       >
                                         {student.isActive
                                           ? "Đang học"
-                                          : "Tạm nghỉ"}
+                                          : "Ngừng hoạt động"}
                                       </span>
                                     </td>
                                   </tr>
@@ -5236,9 +5685,44 @@ function AdminDashboard({ user, onLogout }) {
                     <div className="info-row">
                       <span className="info-label">Lớp học hiện tại:</span>
                       <span className="info-value">
-                        {selectedUserDetail.currentClasses?.length || 0} lớp
+                        {selectedUserDetail.classId?.length ||
+                          selectedUserDetail.currentClasses?.length ||
+                          0}{" "}
+                        lớp
                       </span>
                     </div>
+
+                    {/* Hiển thị danh sách lớp cụ thể cho Student */}
+                    {(selectedUserDetail.classId?.length > 0 ||
+                      selectedUserDetail.currentClasses?.length > 0) && (
+                      <div className="info-row">
+                        <span className="info-label">Danh sách lớp:</span>
+                        <div className="info-value">
+                          {(
+                            selectedUserDetail.classId ||
+                            selectedUserDetail.currentClasses ||
+                            []
+                          ).map((cls, index) => (
+                            <div
+                              key={cls._id || cls.id || index}
+                              style={{
+                                display: "inline-block",
+                                padding: "0.25rem 0.5rem",
+                                margin: "0.25rem 0.25rem 0.25rem 0",
+                                background: "#e0f2fe",
+                                color: "#0c4a6e",
+                                borderRadius: "4px",
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              {cls.className ||
+                                cls.name ||
+                                `Lớp ${cls._id || cls.id || index + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="info-row">
                       <span className="info-label">Phụ huynh:</span>
@@ -5291,9 +5775,44 @@ function AdminDashboard({ user, onLogout }) {
                     <div className="info-row">
                       <span className="info-label">Số lớp đang dạy:</span>
                       <span className="info-value">
-                        {selectedUserDetail.currentClasses?.length || 0} lớp
+                        {selectedUserDetail.classId?.length ||
+                          selectedUserDetail.currentClasses?.length ||
+                          0}{" "}
+                        lớp
                       </span>
                     </div>
+
+                    {/* Hiển thị danh sách lớp cụ thể */}
+                    {(selectedUserDetail.classId?.length > 0 ||
+                      selectedUserDetail.currentClasses?.length > 0) && (
+                      <div className="info-row">
+                        <span className="info-label">Danh sách lớp:</span>
+                        <div className="info-value">
+                          {(
+                            selectedUserDetail.classId ||
+                            selectedUserDetail.currentClasses ||
+                            []
+                          ).map((cls, index) => (
+                            <div
+                              key={cls._id || cls.id || index}
+                              style={{
+                                display: "inline-block",
+                                padding: "0.25rem 0.5rem",
+                                margin: "0.25rem 0.25rem 0.25rem 0",
+                                background: "#fef3c7",
+                                color: "#92400e",
+                                borderRadius: "4px",
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              {cls.className ||
+                                cls.name ||
+                                `Lớp ${cls._id || cls.id || index + 1}`}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="info-row">
                       <span className="info-label">Trạng thái:</span>

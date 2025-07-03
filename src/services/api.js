@@ -277,7 +277,25 @@ class ApiService {
 
   async createUser(token, userData) {
     try {
-      const response = await this.apiCall("/v1/api/users", {
+      let endpoint = "/v1/api/users";
+
+      // Choose the appropriate endpoint based on role
+      if (userData.role) {
+        const role = userData.role.toLowerCase();
+        if (role === "teacher") {
+          endpoint = "/v1/api/teachers";
+        } else if (role === "student") {
+          endpoint = "/v1/api/students";
+        } else if (role === "parent") {
+          endpoint = "/v1/api/parents";
+        }
+      }
+
+      console.log(
+        `🔰 Creating user with role: ${userData.role} via endpoint: ${endpoint}`
+      );
+
+      const response = await this.apiCall(endpoint, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
