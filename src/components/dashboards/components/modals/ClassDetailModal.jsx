@@ -87,15 +87,39 @@ function ClassDetailModal({
 
   // Handle click on teacher to view details
   const handleTeacherClick = () => {
-    if (selectedClass.teacherId && handleViewUserDetail) {
-      handleViewUserDetail(selectedClass.teacherId);
+    if (selectedClass.teacher?._id && handleViewUserDetail) {
+      // Create a user summary object for the teacher
+      const teacherSummary = {
+        id: selectedClass.teacher.userId || selectedClass.teacher._id, // User ID in users table
+        userId: selectedClass.teacher.userId || selectedClass.teacher._id,
+        name: selectedClass.teacher.name || selectedClass.teacherName,
+        email: selectedClass.teacher.email,
+        role: "Teacher",
+        roleId: selectedClass.teacher._id, // Teacher record ID
+        ...selectedClass.teacher,
+      };
+      console.log("🔍 Viewing teacher details:", teacherSummary);
+      // handleViewUserDetail will handle disabled users gracefully
+      handleViewUserDetail(teacherSummary);
     }
   };
 
   // Handle click on student to view details
-  const handleStudentClick = (studentId) => {
+  const handleStudentClick = (studentId, student = null) => {
     if (studentId && handleViewUserDetail) {
-      handleViewUserDetail(studentId);
+      // Create a user summary object for the student
+      const studentSummary = {
+        id: student?.userId?._id || student?.userId || studentId, // User ID in users table
+        userId: student?.userId?._id || student?.userId || studentId,
+        name: student?.userId?.name || student?.name || "Unknown Student",
+        email: student?.userId?.email || student?.email,
+        role: "Student",
+        roleId: student?._id || studentId, // Student record ID
+        ...student,
+      };
+      console.log("🔍 Viewing student details:", studentSummary);
+      // handleViewUserDetail will handle disabled users gracefully
+      handleViewUserDetail(studentSummary);
     }
   };
 
@@ -324,7 +348,9 @@ function ClassDetailModal({
                         color: "#1e293b",
                       }}
                     >
-                      {selectedClass.teacherName || "Chưa phân công giáo viên"}
+                      {selectedClass.teacher && selectedClass.teacher.name
+                        ? selectedClass.teacher.name
+                        : "Chưa phân công giáo viên"}
                     </p>
                     <div
                       style={{
@@ -334,7 +360,7 @@ function ClassDetailModal({
                         color: "#64748b",
                       }}
                     >
-                      {selectedClass.teacherEmail && (
+                      {selectedClass.teacher?.email && (
                         <span
                           style={{
                             display: "flex",
@@ -343,10 +369,10 @@ function ClassDetailModal({
                           }}
                         >
                           <FiMail />
-                          {selectedClass.teacherEmail}
+                          {selectedClass.teacher.email}
                         </span>
                       )}
-                      {selectedClass.teacherPhone && (
+                      {selectedClass.teacher?.phone && (
                         <span
                           style={{
                             display: "flex",
@@ -355,12 +381,12 @@ function ClassDetailModal({
                           }}
                         >
                           <FiPhone />
-                          {selectedClass.teacherPhone}
+                          {selectedClass.teacher.phone}
                         </span>
                       )}
                     </div>
                   </div>
-                  {selectedClass.teacherId && (
+                  {selectedClass.teacher?._id && (
                     <button
                       onClick={handleTeacherClick}
                       style={{
@@ -368,7 +394,11 @@ function ClassDetailModal({
                         alignItems: "center",
                         gap: "0.5rem",
                         padding: "0.75rem 1rem",
-                        backgroundColor: "#3b82f6",
+                        backgroundColor:
+                          selectedClass.teacher?.isDisabled ||
+                          selectedClass.teacher?.status === "disabled"
+                            ? "#9ca3af"
+                            : "#3b82f6",
                         color: "white",
                         border: "none",
                         borderRadius: "0.5rem",
@@ -376,13 +406,38 @@ function ClassDetailModal({
                         fontWeight: "500",
                         cursor: "pointer",
                         transition: "all 0.2s ease",
+                        opacity:
+                          selectedClass.teacher?.isDisabled ||
+                          selectedClass.teacher?.status === "disabled"
+                            ? 0.8
+                            : 1,
                       }}
                       onMouseOver={(e) => {
-                        e.target.style.backgroundColor = "#2563eb";
+                        if (
+                          !(
+                            selectedClass.teacher?.isDisabled ||
+                            selectedClass.teacher?.status === "disabled"
+                          )
+                        ) {
+                          e.target.style.backgroundColor = "#2563eb";
+                        }
                       }}
                       onMouseOut={(e) => {
-                        e.target.style.backgroundColor = "#3b82f6";
+                        if (
+                          !(
+                            selectedClass.teacher?.isDisabled ||
+                            selectedClass.teacher?.status === "disabled"
+                          )
+                        ) {
+                          e.target.style.backgroundColor = "#3b82f6";
+                        }
                       }}
+                      title={
+                        selectedClass.teacher?.isDisabled ||
+                        selectedClass.teacher?.status === "disabled"
+                          ? "Người dùng đã bị vô hiệu hóa - Xem thông tin cơ bản"
+                          : "Xem chi tiết giáo viên"
+                      }
                     >
                       <FiEye />
                       Xem chi tiết
@@ -650,7 +705,10 @@ function ClassDetailModal({
                         color: "#1e293b",
                       }}
                     >
-                      Tổng số học sinh: {selectedClass.currentStudents || 0}
+                      Tổng số học sinh:{" "}
+                      {typeof selectedClass.studentCount === "number"
+                        ? selectedClass.studentCount
+                        : 0}
                     </p>
                   </div>
                   <button
@@ -994,8 +1052,8 @@ function ClassDetailModal({
                     fontWeight: "500",
                   }}
                 >
-                  Tổng số học sinh: {filteredStudents.length} /{" "}
-                  {students.length}
+                  Tổng số học sinh:{" "}
+                  {typeof students.length === "number" ? students.length : 0}
                 </p>
               </div>
 
@@ -1095,11 +1153,8 @@ function ClassDetailModal({
                               }}
                               onClick={() =>
                                 handleStudentClick(
-                                  student.idObj || {
-                                    id: student.id || student._id,
-                                    role: "student",
-                                    roleId: student.id || student._id,
-                                  }
+                                  student.id || student._id,
+                                  student
                                 )
                               }
                             >
@@ -1131,6 +1186,20 @@ function ClassDetailModal({
                                     }}
                                   >
                                     Giảm {student.discount}%
+                                  </span>
+                                )}
+                                {(student.isDisabled ||
+                                  student.status === "disabled") && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      backgroundColor: "#fca5a5",
+                                      color: "#991b1b",
+                                      padding: "0.125rem 0.375rem",
+                                      borderRadius: "9999px",
+                                    }}
+                                  >
+                                    Vô hiệu hóa
                                   </span>
                                 )}
                               </div>
@@ -1166,11 +1235,8 @@ function ClassDetailModal({
                               <button
                                 onClick={() =>
                                   handleStudentClick(
-                                    student.idObj || {
-                                      id: student.id || student._id,
-                                      role: "student",
-                                      roleId: student.id || student._id,
-                                    }
+                                    student.id || student._id,
+                                    student
                                   )
                                 }
                                 style={{
@@ -1178,7 +1244,11 @@ function ClassDetailModal({
                                   alignItems: "center",
                                   gap: "0.25rem",
                                   padding: "0.375rem 0.75rem",
-                                  backgroundColor: "#3b82f6",
+                                  backgroundColor:
+                                    student.isDisabled ||
+                                    student.status === "disabled"
+                                      ? "#9ca3af"
+                                      : "#3b82f6",
                                   color: "white",
                                   border: "none",
                                   borderRadius: "0.375rem",
@@ -1186,13 +1256,38 @@ function ClassDetailModal({
                                   cursor: "pointer",
                                   transition: "all 0.2s ease",
                                   margin: "0 auto",
+                                  opacity:
+                                    student.isDisabled ||
+                                    student.status === "disabled"
+                                      ? 0.8
+                                      : 1,
                                 }}
                                 onMouseOver={(e) => {
-                                  e.target.style.backgroundColor = "#2563eb";
+                                  if (
+                                    !(
+                                      student.isDisabled ||
+                                      student.status === "disabled"
+                                    )
+                                  ) {
+                                    e.target.style.backgroundColor = "#2563eb";
+                                  }
                                 }}
                                 onMouseOut={(e) => {
-                                  e.target.style.backgroundColor = "#3b82f6";
+                                  if (
+                                    !(
+                                      student.isDisabled ||
+                                      student.status === "disabled"
+                                    )
+                                  ) {
+                                    e.target.style.backgroundColor = "#3b82f6";
+                                  }
                                 }}
+                                title={
+                                  student.isDisabled ||
+                                  student.status === "disabled"
+                                    ? "Người dùng đã bị vô hiệu hóa - Xem thông tin cơ bản"
+                                    : "Xem chi tiết học sinh"
+                                }
                               >
                                 <FiEye />
                                 Xem

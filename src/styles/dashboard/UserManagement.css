@@ -1,0 +1,161 @@
+/* UserManagement.css - Styling for User Management Component */
+
+/* Button Styles */
+.user-edit-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  text-decoration: none;
+}
+
+.user-edit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Save/Success Button */
+.user-edit-btn-save {
+  background-color: #22c55e;
+  color: white;
+}
+
+.user-edit-btn-save:hover:not(:disabled) {
+  background-color: #16a34a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.user-edit-btn-save:active:not(:disabled) {
+  background-color: #15803d;
+  transform: translateY(0);
+}
+
+/* Cancel/Danger Button */
+.user-edit-btn-cancel {
+  background-color: #ef4444;
+  color: white;
+}
+
+.user-edit-btn-cancel:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.user-edit-btn-cancel:active {
+  background-color: #b91c1c;
+  transform: translateY(0);
+}
+
+/* Primary Button */
+.user-edit-btn-primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.user-edit-btn-primary:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.user-edit-btn-primary:active {
+  background-color: #1d4ed8;
+  transform: translateY(0);
+}
+
+/* Secondary Button */
+.user-edit-btn-secondary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.user-edit-btn-secondary:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.user-edit-btn-secondary:active {
+  background-color: #1d4ed8;
+  transform: translateY(0);
+}
+
+/* Action Container */
+.user-edit-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Small Button Variant */
+.user-edit-btn-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  min-width: 70px;
+}
+
+/* Loading State */
+.user-edit-btn-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.user-edit-btn-loading::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Form Actions Container */
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .user-edit-actions,
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .user-edit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

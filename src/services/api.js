@@ -180,6 +180,10 @@ class ApiService {
   }
   async getUserById(token, userId, role = null, roleId = null) {
     try {
+      console.log(
+        `🔍 getUserById called with: userId=${userId}, role=${role}, roleId=${roleId}`
+      );
+
       // For role-based queries, use roleId if provided
       let endpoint = "";
       let targetId = userId; // default fallback
@@ -227,7 +231,24 @@ class ApiService {
     } catch (error) {
       console.error("Error fetching user details:", error);
 
-      // Only try fallback if we were trying role-specific endpoint
+      // Check if the error is due to a disabled user
+      const errorMessage = error.message || "";
+      const isDisabledUser =
+        errorMessage.includes("đã bị vô hiệu hóa") ||
+        errorMessage.includes("disabled") ||
+        errorMessage.includes("deactivated");
+
+      if (isDisabledUser) {
+        return {
+          success: false,
+          message:
+            "Người dùng này đã bị vô hiệu hóa và không thể xem chi tiết.",
+          error: "USER_DISABLED",
+          isDisabled: true,
+        };
+      }
+
+      // Only try fallback if we were trying role-specific endpoint and it's not a disabled user error
       if (role && roleId && roleId !== userId) {
         try {
           console.log(
@@ -252,6 +273,23 @@ class ApiService {
           }
         } catch (fallbackError) {
           console.error("Fallback API call also failed:", fallbackError);
+
+          // Check if fallback error is also due to disabled user
+          const fallbackErrorMessage = fallbackError.message || "";
+          const isFallbackDisabledUser =
+            fallbackErrorMessage.includes("đã bị vô hiệu hóa") ||
+            fallbackErrorMessage.includes("disabled") ||
+            fallbackErrorMessage.includes("deactivated");
+
+          if (isFallbackDisabledUser) {
+            return {
+              success: false,
+              message:
+                "Người dùng này đã bị vô hiệu hóa và không thể xem chi tiết.",
+              error: "USER_DISABLED",
+              isDisabled: true,
+            };
+          }
         }
       }
 
@@ -336,6 +374,7 @@ class ApiService {
         }
 
         console.log(`🔄 Updating ${role} via: ${endpoint}`);
+        console.log(`📋 Update data for ${role}:`, updateData);
 
         const response = await this.apiCall(endpoint, {
           method: "PATCH",
@@ -358,6 +397,7 @@ class ApiService {
         const endpoint = `/v1/api/users/${targetId}`;
 
         console.log(`🔄 Updating user via general endpoint: ${endpoint}`);
+        console.log(`📋 Update data for general user:`, updateData);
 
         const response = await this.apiCall(endpoint, {
           method: "PATCH",
@@ -376,11 +416,24 @@ class ApiService {
         };
       }
     } catch (error) {
-      console.error("Error updating user:", error);
+      console.error("❌ Error updating user:", error);
+      console.error("📋 Failed update data:", updateData);
+      console.error("🔍 Update context:", { userId, role, roleId });
+
+      // Extract more specific error information
+      let errorMessage = error.message || "Failed to update user";
+
+      // Check for specific backend errors
+      if (error.message && error.message.includes("500")) {
+        errorMessage =
+          "Server error occurred while updating user. Please check the data and try again.";
+      }
+
       return {
         success: false,
-        message: error.message || "Failed to update user",
+        message: errorMessage,
         error: error,
+        context: { userId, role, roleId, updateData },
       };
     }
   }
@@ -432,6 +485,13 @@ class ApiService {
   }
 
   async createClass(token, classData) {
+    console.log("📡 API Call - createClass:", {
+      endpoint: "/v1/api/classes",
+      method: "POST",
+      token: token ? "✅ Present" : "❌ Missing",
+      classData: classData,
+    });
+
     return await this.apiCall("/v1/api/classes", {
       method: "POST",
       headers: {
@@ -1059,6 +1119,15 @@ class ApiService {
     return await this.apiCall("/v1/api/advertisements/public", {
       method: "GET",
     });
+  }
+
+  async getPublicAdvertisementById(advertisementId) {
+    return await this.apiCall(
+      `/v1/api/advertisements/public/${advertisementId}`,
+      {
+        method: "GET",
+      }
+    );
   }
 
   async createAdvertisement(token, advertisementData) {

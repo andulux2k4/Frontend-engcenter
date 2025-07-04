@@ -12,13 +12,14 @@ import {
 } from "react-icons/fi";
 import { HiAcademicCap, HiInformationCircle } from "react-icons/hi";
 import { BiMoney } from "react-icons/bi";
-import UserFormModal from "./modals/UserFormModal";
+import "../../../styles/dashboard/UserManagement.css";
 
 const UserManagement = ({
   users,
   filteredUsers,
   loading,
   error,
+  setError,
   pagination,
   setPagination,
   userFilters,
@@ -80,24 +81,8 @@ const UserManagement = ({
         </h2>
         <div className="section-actions">
           <button
-            className="btn btn-primary"
+            className="user-edit-btn user-edit-btn-primary"
             onClick={handleAddUser}
-            style={{
-              padding: "0.75rem 1.5rem",
-              backgroundColor: "#3b82f6",
-              color: "white",
-              border: "none",
-              borderRadius: "0.5rem",
-              fontSize: "0.875rem",
-              fontWeight: "500",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              boxShadow:
-                "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-            }}
           >
             <FiUser style={{ fontSize: "1rem" }} />
             Thêm người dùng mới
@@ -651,17 +636,7 @@ const UserManagement = ({
                           className="user-edit-select"
                           onChange={(e) => {
                             const selectedParentId = e.target.value;
-                            console.log("🔍 Parent dropdown selection:", {
-                              selectedParentId,
-                              currentParentId: formData.parentId,
-                              allParents: parents,
-                              parentsCount: parents.length,
-                            });
                             if (selectedParentId && selectedParentId !== "") {
-                              console.log(
-                                "✅ Setting parent ID:",
-                                selectedParentId
-                              );
                               setFormData((prev) => ({
                                 ...prev,
                                 parentId: selectedParentId,
@@ -789,13 +764,6 @@ const UserManagement = ({
                             }}
                           >
                             {formData.classIds.map((id) => {
-                              // Debug thông tin cho Teacher form
-                              if (allClasses.length === 0) {
-                                console.log(
-                                  "⚠️ allClasses is empty for Teacher form"
-                                );
-                              }
-
                               const classItem = allClasses.find(
                                 (c) => c.id === id || c._id === id
                               );
@@ -1063,6 +1031,19 @@ const UserManagement = ({
                     fontWeight: "600",
                     color: "#374151",
                     borderBottom: "1px solid #e5e7eb",
+                    minWidth: "80px",
+                    width: "10%",
+                  }}
+                >
+                  Giới tính
+                </th>
+                <th
+                  style={{
+                    padding: "1.25rem 1rem",
+                    textAlign: "left",
+                    fontWeight: "600",
+                    color: "#374151",
+                    borderBottom: "1px solid #e5e7eb",
                     minWidth: "100px",
                     width: "12.5%",
                   }}
@@ -1265,6 +1246,36 @@ const UserManagement = ({
                     <td
                       style={{
                         padding: "1.25rem 1rem",
+                        color: "#374151",
+                        verticalAlign: "middle",
+                        textAlign: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.875rem",
+                          color: user.gender ? "#374151" : "#9ca3af",
+                          fontWeight: "500",
+                        }}
+                      >
+                        {(() => {
+                          const gender = user.gender?.toLowerCase();
+                          switch (gender) {
+                            case "male":
+                              return "Nam";
+                            case "female":
+                              return "Nữ";
+                            case "other":
+                              return "Khác";
+                            default:
+                              return "Chưa có";
+                          }
+                        })()}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: "1.25rem 1rem",
                         verticalAlign: "middle",
                       }}
                     >
@@ -1358,55 +1369,23 @@ const UserManagement = ({
                         }}
                       >
                         <button
-                          className="btn btn-secondary"
+                          className="user-edit-btn user-edit-btn-sm user-edit-btn-secondary"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEditUser(user);
                           }}
                           disabled={loading}
-                          style={{
-                            padding: "0.625rem 0.875rem",
-                            fontSize: "0.75rem",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "0.375rem",
-                            backgroundColor: "#f3f4f6",
-                            color: "#374151",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "0.375rem",
-                            cursor: loading ? "not-allowed" : "pointer",
-                            transition: "all 0.2s ease",
-                            opacity: loading ? 0.5 : 1,
-                            fontWeight: "500",
-                            minWidth: "70px",
-                          }}
                         >
                           <FiEdit style={{ fontSize: "0.875rem" }} />
                           Sửa
                         </button>
                         <button
-                          className="btn btn-danger"
+                          className="user-edit-btn user-edit-btn-sm user-edit-btn-cancel"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteUser(user.id);
                           }}
                           disabled={loading}
-                          style={{
-                            padding: "0.625rem 0.875rem",
-                            fontSize: "0.75rem",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "0.375rem",
-                            backgroundColor: "#fef2f2",
-                            color: "#dc2626",
-                            border: "1px solid #fecaca",
-                            borderRadius: "0.375rem",
-                            cursor: loading ? "not-allowed" : "pointer",
-                            transition: "all 0.2s ease",
-                            opacity: loading ? 0.5 : 1,
-                            fontWeight: "500",
-                            minWidth: "70px",
-                          }}
                         >
                           <FiTrash2 style={{ fontSize: "0.875rem" }} />
                           Xóa

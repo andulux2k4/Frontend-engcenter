@@ -949,359 +949,65 @@ html {
   overflow-y: auto;
 }
 
-.user-avatar-section {
-  text-align: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
+/* Responsive design for UserDetailModal */
+@media (max-width: 768px) {
+  .user-detail-modal-overlay {
+    padding: 0.5rem;
+  }
+
+  .user-detail-modal-content {
+    max-width: 95%;
+    max-height: 95vh;
+  }
+
+  .user-detail-modal-header,
+  .user-detail-modal-body,
+  .user-detail-modal-footer {
+    padding: 1rem;
+  }
+
+  .user-avatar {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.25rem;
+  }
+
+  .user-name {
+    font-size: 1.125rem;
+  }
+
+  .user-info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .info-value {
+    text-align: left;
+  }
+
+  .disabled-badge {
+    margin-left: 0;
+    margin-top: 0.25rem;
+  }
 }
 
-.user-avatar {
-  width: 4rem;
-  height: 4rem;
-  border-radius: 50%;
-  background-color: #3b82f6;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 auto 1rem;
-}
+@media (max-width: 480px) {
+  .user-detail-modal-content {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
 
-.user-name {
-  margin: 0 0 0.75rem 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #111827;
-}
+  .user-detail-modal-header {
+    padding: 0.75rem;
+  }
 
-.user-role-badge {
-  padding: 0.375rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+  .user-detail-modal-body {
+    padding: 0.75rem;
+  }
 
-.role-admin {
-  background-color: #fee2e2;
-  color: #dc2626;
-}
-
-.role-teacher {
-  background-color: #dbeafe;
-  color: #2563eb;
-}
-
-.role-student {
-  background-color: #d1fae5;
-  color: #059669;
-}
-
-.role-parent {
-  background-color: #fef3c7;
-  color: #d97706;
-}
-
-.role-default {
-  background-color: #f3f4f6;
-  color: #6b7280;
-}
-
-.user-info-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.user-info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f9fafb;
-}
-
-.user-info-row:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-weight: 500;
-  color: #6b7280;
-  font-size: 0.875rem;
-}
-
-.info-value {
-  color: #111827;
-  font-size: 0.875rem;
-  text-align: right;
-  max-width: 60%;
-  word-break: break-word;
-}
-
-.status-active {
-  color: #059669 !important;
-  font-weight: 600;
-}
-
-.status-inactive {
-  color: #dc2626 !important;
-  font-weight: 600;
-}
-
-.status-pending {
-  color: #d97706 !important;
-  font-weight: 600;
-}
-
-.status-default {
-  color: #6b7280 !important;
-}
-
-.user-info-section {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #f3f4f6;
-}
-
-.section-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 1rem 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.user-detail-modal-footer {
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-  border-top: 1px solid var(--border-color);
-}
-
-.modal-footer-center {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-}
-
-/* Form Styles for UserFormModal */
-.user-edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.form-section {
-  background-color: #f8f9fa;
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  border: 1px solid #e5e7eb;
-}
-
-.form-section h3.section-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 1rem 0;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.form-section h3.section-title svg {
-  width: 1rem;
-  height: 1rem;
-  color: #6b7280;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.form-row:last-child {
-  margin-bottom: 0;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  transition: border-color 0.2s ease;
-  background-color: white;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-group input:disabled,
-.form-group select:disabled {
-  background-color: #f9fafb;
-  color: #6b7280;
-  cursor: not-allowed;
-}
-
-.form-group textarea {
-  min-height: 4rem;
-  resize: vertical;
-}
-
-.form-error {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-}
-
-.form-info {
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e40af;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.form-info svg {
-  width: 1rem;
-  height: 1rem;
-  flex-shrink: 0;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-  margin-top: 2rem;
-}
-
-.form-actions button {
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid;
-}
-
-.form-actions .btn-cancel {
-  background-color: #dc2626 !important;
-  color: white !important;
-  border-color: #dc2626 !important;
-}
-
-.form-actions .btn-cancel:hover {
-  background-color: #b91c1c !important;
-  border-color: #b91c1c !important;
-}
-
-.form-actions .btn-save {
-  background-color: #2563eb !important;
-  color: white !important;
-  border-color: #2563eb !important;
-}
-
-.form-actions .btn-save:hover {
-  background-color: #1d4ed8 !important;
-  border-color: #1d4ed8 !important;
-}
-
-/* Override any default button styles that might interfere */
-.user-edit-modal button[type="button"],
-.user-edit-modal button[type="submit"],
-.modal-overlay button[type="button"],
-.modal-overlay button[type="submit"] {
-  all: unset !important;
-  box-sizing: border-box !important;
-}
-
-/* Re-apply our custom styles after reset */
-.user-edit-modal .form-actions button,
-.modal-overlay .form-actions button {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.5rem !important;
-  padding: 0.75rem 1.5rem !important;
-  border-radius: 0.375rem !important;
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  font-family: inherit !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  border: 1px solid !important;
-  text-decoration: none !important;
-  outline: none !important;
-  user-select: none !important;
-}
-
-/* Force override common.css button styles */
-.form-actions .btn-cancel,
-.form-actions .btn-save,
-.user-edit-actions .btn-cancel,
-.user-edit-actions .btn-save {
-  background-color: unset !important;
-  border: unset !important;
-  color: unset !important;
-  min-width: unset !important;
-  height: unset !important;
-}
-
-/* Apply our specific styles */
-.form-actions .btn-cancel,
-.user-edit-actions .btn-cancel {
-  background-color: #dc2626 !important;
-  color: white !important;
-  border: 1px solid #dc2626 !important;
-}
-
-.form-actions .btn-save,
-.user-edit-actions .btn-save {
-  background-color: #2563eb !important;
-  color: white !important;
-  border: 1px solid #2563eb !important;
+  .user-detail-modal-footer {
+    padding: 0.75rem;
+  }
 }

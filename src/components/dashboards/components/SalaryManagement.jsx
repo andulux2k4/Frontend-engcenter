@@ -211,16 +211,12 @@ const SalaryManagement = ({ user }) => {
       apiFilters.includeList = true;
       apiFilters.includeStats = true;
 
-      console.log("API Filters being sent:", apiFilters);
-
       const response = await apiService.getTeacherWages(
         user.token,
         pagination.page,
         pagination.limit,
         apiFilters
       );
-
-      console.log("API Response:", response);
 
       if (response.data) {
         // Transform API response to match our component structure
@@ -254,7 +250,6 @@ const SalaryManagement = ({ user }) => {
           grade: item.classId?.grade || "",
         }));
 
-        console.log("Transformed data:", transformedData);
         setWagesList(transformedData);
 
         // Update pagination
@@ -288,7 +283,6 @@ const SalaryManagement = ({ user }) => {
       );
 
       // Fallback to mock data when API fails
-      console.log("Falling back to mock data...");
       setWagesList(mockTeacherWages);
       setStats({
         totalWages: mockTeacherWages.reduce(
@@ -2150,7 +2144,6 @@ const EditModal = ({ editData, onClose, onSave, formatCurrency }) => {
       return;
     }
 
-    console.log("Changed fields only:", changedFields);
     onSave(changedFields);
   };
 

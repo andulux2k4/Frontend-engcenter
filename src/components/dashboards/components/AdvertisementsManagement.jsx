@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { MdCampaign } from "react-icons/md";
 import { FiPlus, FiEdit, FiTrash2, FiEye } from "react-icons/fi";
 import apiService from "../../../services/api";
@@ -78,6 +78,9 @@ const AdvertisementsManagement = ({ user }) => {
   const [advertisements, setAdvertisements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isRequestInProgress, setIsRequestInProgress] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(false);
+  const [apiDisabled, setApiDisabled] = useState(false); // Flag to disable API calls
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,14 +91,11 @@ const AdvertisementsManagement = ({ user }) => {
   // Form state
   const [adForm, setAdForm] = useState({
     title: "",
-    description: "",
-    url: "",
-    imageUrl: "",
+    content: "",
     startDate: "",
     endDate: "",
-    target: "all", // all, student, parent, teacher
-    position: "homepage", // homepage, dashboard, sidebar
-    status: "Hoạt động",
+    images: [],
+    isActive: true,
   });
 
   // Filter state
@@ -110,109 +110,185 @@ const AdvertisementsManagement = ({ user }) => {
     limit: 5,
   });
 
-  // Mock advertisement data
+  // Mock advertisement data (matching API structure)
   const mockAdvertisements = [
     {
-      id: 1,
+      _id: "64f8a5b2c3d4e5f6a7b8c9d0",
       title: "Khóa học IELTS Intensive",
-      description:
+      content:
         "Khóa học IELTS tăng tốc, cam kết đạt 6.5+ sau 3 tháng. Giảm 15% học phí cho học viên đăng ký trước 15/04/2024.",
-      url: "https://tttenglish.edu.vn/ielts-intensive",
-      imageUrl: "https://via.placeholder.com/600x300?text=IELTS+Intensive",
-      startDate: "2024-03-20",
-      endDate: "2024-04-15",
-      target: "all",
-      position: "homepage",
-      status: "Hoạt động",
+      images: [
+        {
+          url: "https://picsum.photos/600/300?random=1",
+          public_id: "ielts-intensive",
+          format: "jpg",
+        },
+      ],
+      startDate: "2024-03-20T00:00:00.000Z",
+      endDate: "2024-04-15T00:00:00.000Z",
+      isActive: true,
+      createdAt: "2024-03-10T08:00:00.000Z",
+      updatedAt: "2024-03-10T08:00:00.000Z",
+      views: 120,
+      clicks: 25,
     },
     {
-      id: 2,
+      _id: "64f8a5b2c3d4e5f6a7b8c9d1",
       title: "Khóa học TOEIC Online",
-      description:
+      content:
         "Học TOEIC online với giáo viên kinh nghiệm. Học phí chỉ từ 1.990.000đ cho 3 tháng. Tặng khóa luyện đề miễn phí.",
-      url: "https://tttenglish.edu.vn/toeic-online",
-      imageUrl: "https://via.placeholder.com/600x300?text=TOEIC+Online",
-      startDate: "2024-03-10",
-      endDate: "2024-04-10",
-      target: "student",
-      position: "dashboard",
-      status: "Hoạt động",
+      images: [
+        {
+          url: "https://picsum.photos/600/300?random=2",
+          public_id: "toeic-online",
+          format: "jpg",
+        },
+      ],
+      startDate: "2024-03-10T00:00:00.000Z",
+      endDate: "2024-04-10T00:00:00.000Z",
+      isActive: true,
+      createdAt: "2024-03-05T08:00:00.000Z",
+      updatedAt: "2024-03-05T08:00:00.000Z",
+      views: 85,
+      clicks: 18,
     },
     {
-      id: 3,
+      _id: "64f8a5b2c3d4e5f6a7b8c9d2",
       title: "Chương trình du học hè 2024",
-      description:
+      content:
         "Du học hè tại Anh, Mỹ, Singapore. Trải nghiệm môi trường học tập quốc tế, nâng cao kỹ năng tiếng Anh và khám phá văn hóa.",
-      url: "https://tttenglish.edu.vn/summer-abroad",
-      imageUrl: "https://via.placeholder.com/600x300?text=Summer+Abroad",
-      startDate: "2024-02-15",
-      endDate: "2024-04-30",
-      target: "parent",
-      position: "homepage",
-      status: "Hoạt động",
+      images: [
+        {
+          url: "https://picsum.photos/600/300?random=3",
+          public_id: "summer-abroad",
+          format: "jpg",
+        },
+      ],
+      startDate: "2024-02-15T00:00:00.000Z",
+      endDate: "2024-04-30T00:00:00.000Z",
+      isActive: true,
+      createdAt: "2024-02-10T08:00:00.000Z",
+      updatedAt: "2024-02-10T08:00:00.000Z",
+      views: 200,
+      clicks: 45,
     },
     {
-      id: 4,
+      _id: "64f8a5b2c3d4e5f6a7b8c9d3",
       title: "Tuyển dụng giáo viên tiếng Anh",
-      description:
+      content:
         "Trung tâm đang tuyển dụng giáo viên tiếng Anh cho các khóa học IELTS, TOEIC và tiếng Anh cho trẻ em.",
-      url: "https://tttenglish.edu.vn/careers",
-      imageUrl: "https://via.placeholder.com/600x300?text=Teacher+Recruitment",
-      startDate: "2024-03-01",
-      endDate: "2024-03-31",
-      target: "teacher",
-      position: "sidebar",
-      status: "Đã kết thúc",
+      images: [
+        {
+          url: "https://picsum.photos/600/300?random=4",
+          public_id: "teacher-recruitment",
+          format: "jpg",
+        },
+      ],
+      startDate: "2024-03-01T00:00:00.000Z",
+      endDate: "2024-03-31T00:00:00.000Z",
+      isActive: false,
+      createdAt: "2024-02-25T08:00:00.000Z",
+      updatedAt: "2024-03-31T08:00:00.000Z",
+      views: 60,
+      clicks: 10,
     },
     {
-      id: 5,
+      _id: "64f8a5b2c3d4e5f6a7b8c9d4",
       title: "Khóa học tiếng Anh cho trẻ em",
-      description:
+      content:
         "Khóa học tiếng Anh dành cho trẻ em từ 4-12 tuổi. Phương pháp học thông qua các hoạt động vui chơi, giúp trẻ yêu thích ngôn ngữ.",
-      url: "https://tttenglish.edu.vn/english-for-kids",
-      imageUrl: "https://via.placeholder.com/600x300?text=English+For+Kids",
-      startDate: "2024-03-15",
-      endDate: "2024-05-15",
-      target: "parent",
-      position: "homepage",
-      status: "Hoạt động",
+      images: [
+        {
+          url: "https://picsum.photos/600/300?random=5",
+          public_id: "english-for-kids",
+          format: "jpg",
+        },
+      ],
+      startDate: "2024-03-15T00:00:00.000Z",
+      endDate: "2024-05-15T00:00:00.000Z",
+      isActive: true,
+      createdAt: "2024-03-01T08:00:00.000Z",
+      updatedAt: "2024-03-01T08:00:00.000Z",
+      views: 150,
+      clicks: 35,
     },
   ];
 
-  // Fetch advertisements from API
-  const fetchAdvertisements = async () => {
-    if (!user?.token) return;
+  // Fetch advertisements from API (non-blocking)
+  const fetchAdvertisements = useCallback(async () => {
+    if (!user?.token || isRequestInProgress || apiDisabled) {
+      return;
+    }
 
+    setIsRequestInProgress(true);
     setLoading(true);
-    try {
-      // TODO: Replace with actual API call when available
-      // const response = await apiService.getAdvertisements(user.token);
-      // if (response.success) {
-      //   setAdvertisements(response.data);
-      // } else {
-      //   setError(response.message || "Không thể tải dữ liệu quảng cáo");
-      // }
+    setError(""); // Clear previous errors
 
-      // Using mock data for now
-      setTimeout(() => {
-        setAdvertisements(mockAdvertisements);
-        setLoading(false);
-      }, 500);
+    // Immediately show mock data to prevent blocking UI
+    if (!initialLoad) {
+      setAdvertisements(mockAdvertisements);
+      setInitialLoad(true);
+    }
+
+    try {
+      // Build API URL with proper query parameters
+      const apiUrl = `/v1/api/advertisements?page=1&limit=10&isActive=&search=`;
+
+      // Use Promise.race with shorter timeout for better UX
+      const apiPromise = apiService.apiCall(apiUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      });
+
+      // Create timeout promise - 5 second timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("API_TIMEOUT")), 5000); // 5 second timeout
+      });
+
+      const response = await Promise.race([apiPromise, timeoutPromise]);
+
+      if (response.success && response.data) {
+        setAdvertisements(response.data);
+        setError(""); // Clear error on success
+      } else {
+        setError("API không có dữ liệu. Hiển thị dữ liệu mẫu.");
+      }
     } catch (error) {
-      console.error("Error fetching advertisements:", error);
-      setError("Lỗi kết nối. Vui lòng thử lại.");
+      console.error("💥 Error fetching advertisements:", error);
+
+      if (error.message === "API_TIMEOUT") {
+        setError("API timeout sau 5 giây. Hiển thị dữ liệu mẫu.");
+        // Disable API for this session after timeout
+        setApiDisabled(true);
+      } else {
+        setError("Lỗi kết nối API. Hiển thị dữ liệu mẫu.");
+      }
+
+      // Keep mock data - don't reset
+      if (advertisements.length === 0) {
+        setAdvertisements(mockAdvertisements);
+      }
+    } finally {
+      setIsRequestInProgress(false);
       setLoading(false);
     }
-  };
+  }, [user?.token, initialLoad, apiDisabled]);
 
   // Filter advertisements based on status and search term
-  const filteredAdvertisements = advertisements.filter((ad) => {
-    const matchesStatus = statusFilter === "all" || ad.status === statusFilter;
-    const matchesSearch =
-      ad.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ad.description.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  const filteredAdvertisements = useMemo(() => {
+    return advertisements.filter((ad) => {
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && ad.isActive) ||
+        (statusFilter === "inactive" && !ad.isActive);
+      const matchesSearch =
+        ad.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ad.content.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesStatus && matchesSearch;
+    });
+  }, [advertisements, statusFilter, searchTerm]);
 
   // Calculate pagination
   useEffect(() => {
@@ -225,21 +301,42 @@ const AdvertisementsManagement = ({ user }) => {
       totalPages: pages,
       currentPage: Math.min(prev.currentPage, pages),
     }));
-  }, [filteredAdvertisements, advertisementsPagination.limit]);
+  }, [filteredAdvertisements, advertisementsPagination.limit]); // Fixed dependencies
 
   // Get paginated advertisements
-  const paginatedAdvertisements = filteredAdvertisements.slice(
-    (advertisementsPagination.currentPage - 1) * advertisementsPagination.limit,
-    advertisementsPagination.currentPage * advertisementsPagination.limit
-  );
+  const paginatedAdvertisements = useMemo(() => {
+    return filteredAdvertisements.slice(
+      (advertisementsPagination.currentPage - 1) *
+        advertisementsPagination.limit,
+      advertisementsPagination.currentPage * advertisementsPagination.limit
+    );
+  }, [
+    filteredAdvertisements,
+    advertisementsPagination.currentPage,
+    advertisementsPagination.limit,
+  ]);
 
-  // Load initial data
+  // Load initial data with delay to prevent blocking other API calls
   useEffect(() => {
-    fetchAdvertisements();
-  }, [user?.token]);
+    if (user?.token && !isRequestInProgress) {
+      // Load mock data immediately for better UX
+      if (!initialLoad) {
+        setAdvertisements(mockAdvertisements);
+        setInitialLoad(true);
+      }
 
-  // Format date for display
+      // Then try to fetch real data in background with longer delay
+      const timeoutId = setTimeout(() => {
+        fetchAdvertisements();
+      }, 2000); // 2 second delay to let other APIs load first
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [user?.token]); // Only depend on user token
+
+  // Helper function to format date
   const formatDate = (dateString) => {
+    if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("vi-VN");
   };
@@ -248,14 +345,11 @@ const AdvertisementsManagement = ({ user }) => {
   const handleAddAdvertisement = () => {
     setAdForm({
       title: "",
-      description: "",
-      url: "",
-      imageUrl: "",
+      content: "",
       startDate: new Date().toISOString().split("T")[0],
       endDate: "",
-      target: "all",
-      position: "homepage",
-      status: "Hoạt động",
+      images: [],
+      isActive: true,
     });
     setShowAddModal(true);
   };
@@ -265,14 +359,11 @@ const AdvertisementsManagement = ({ user }) => {
     setSelectedAd(ad);
     setAdForm({
       title: ad.title,
-      description: ad.description,
-      url: ad.url,
-      imageUrl: ad.imageUrl,
-      startDate: ad.startDate,
-      endDate: ad.endDate,
-      target: ad.target,
-      position: ad.position,
-      status: ad.status,
+      content: ad.content,
+      startDate: ad.startDate ? ad.startDate.split("T")[0] : "",
+      endDate: ad.endDate ? ad.endDate.split("T")[0] : "",
+      images: ad.images || [],
+      isActive: ad.isActive,
     });
     setShowEditModal(true);
   };
@@ -290,10 +381,10 @@ const AdvertisementsManagement = ({ user }) => {
   const handleToggleAdvertisementStatus = (adId) => {
     setAdvertisements((prev) =>
       prev.map((ad) =>
-        ad.id === adId
+        ad._id === adId
           ? {
               ...ad,
-              status: ad.status === "Hoạt động" ? "Đã kết thúc" : "Hoạt động",
+              isActive: !ad.isActive,
             }
           : ad
       )
@@ -301,69 +392,148 @@ const AdvertisementsManagement = ({ user }) => {
   };
 
   // Handle delete advertisement
-  const handleDeleteAdvertisement = (adId) => {
+  const handleDeleteAdvertisement = async (adId) => {
     if (window.confirm("Bạn có chắc muốn xóa quảng cáo này?")) {
-      setAdvertisements((prev) => prev.filter((ad) => ad.id !== adId));
+      try {
+        // TODO: Replace with actual API call
+        const response = await apiService.apiCall(
+          `/v1/api/advertisements/${adId}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+
+        if (response.success) {
+          setAdvertisements((prev) => prev.filter((ad) => ad._id !== adId));
+        } else {
+          setError(response.message || "Không thể xóa quảng cáo");
+        }
+      } catch (error) {
+        console.error("Error deleting advertisement:", error);
+        // Mock behavior for development
+        setAdvertisements((prev) => prev.filter((ad) => ad._id !== adId));
+      }
     }
   };
 
   // Handle form submission for adding advertisement
-  const handleSubmitAddForm = (e) => {
+  const handleSubmitAddForm = async (e) => {
     e.preventDefault();
 
-    // Add new advertisement to the list with a generated ID
-    setAdvertisements((prev) => [
-      {
-        ...adForm,
-        id: Date.now(),
-      },
-      ...prev,
-    ]);
+    try {
+      // TODO: Replace with actual API call
+      const response = await apiService.apiCall("/v1/api/advertisements", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({
+          title: adForm.title,
+          content: adForm.content,
+          startDate: adForm.startDate
+            ? new Date(adForm.startDate).toISOString()
+            : null,
+          endDate: adForm.endDate
+            ? new Date(adForm.endDate).toISOString()
+            : null,
+          images: adForm.images,
+        }),
+      });
 
-    setShowAddModal(false);
+      if (response.success) {
+        setAdvertisements((prev) => [response.data, ...prev]);
+        setShowAddModal(false);
+      } else {
+        setError(response.message || "Không thể tạo quảng cáo");
+      }
+    } catch (error) {
+      console.error("Error adding advertisement:", error);
+
+      // Mock behavior for development
+      setAdvertisements((prev) => [
+        {
+          ...adForm,
+          _id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          views: 0,
+          clicks: 0,
+          startDate: adForm.startDate
+            ? new Date(adForm.startDate).toISOString()
+            : null,
+          endDate: adForm.endDate
+            ? new Date(adForm.endDate).toISOString()
+            : null,
+        },
+        ...prev,
+      ]);
+      setShowAddModal(false);
+    }
   };
 
   // Handle form submission for editing advertisement
-  const handleSubmitEditForm = (e) => {
+  const handleSubmitEditForm = async (e) => {
     e.preventDefault();
 
     if (!selectedAd) return;
 
-    // Update the advertisement in the list
-    setAdvertisements((prev) =>
-      prev.map((ad) => (ad.id === selectedAd.id ? { ...ad, ...adForm } : ad))
-    );
+    try {
+      // TODO: Replace with actual API call
+      const response = await apiService.apiCall(
+        `/v1/api/advertisements/${selectedAd._id}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: JSON.stringify({
+            title: adForm.title,
+            content: adForm.content,
+            startDate: adForm.startDate
+              ? new Date(adForm.startDate).toISOString()
+              : null,
+            endDate: adForm.endDate
+              ? new Date(adForm.endDate).toISOString()
+              : null,
+            isActive: adForm.isActive,
+            images: adForm.images,
+          }),
+        }
+      );
 
-    setShowEditModal(false);
-  };
+      if (response.success) {
+        setAdvertisements((prev) =>
+          prev.map((ad) => (ad._id === selectedAd._id ? response.data : ad))
+        );
+        setShowEditModal(false);
+      } else {
+        setError(response.message || "Không thể cập nhật quảng cáo");
+      }
+    } catch (error) {
+      console.error("Error editing advertisement:", error);
 
-  // Helper function to get target audience display name
-  const getTargetDisplay = (target) => {
-    switch (target) {
-      case "all":
-        return "Tất cả";
-      case "student":
-        return "Học sinh";
-      case "parent":
-        return "Phụ huynh";
-      case "teacher":
-        return "Giáo viên";
-      default:
-        return target;
-    }
-  };
-
-  // Helper function to get position display name
-  const getPositionDisplay = (position) => {
-    switch (position) {
-      case "homepage":
-        return "Trang chủ";
-      case "dashboard":
-        return "Dashboard";
-      case "sidebar":
-        return "Sidebar";
-      default:
-        return position;
+      // Mock behavior for development
+      setAdvertisements((prev) =>
+        prev.map((ad) =>
+          ad._id === selectedAd._id
+            ? {
+                ...ad,
+                ...adForm,
+                startDate: adForm.startDate
+                  ? new Date(adForm.startDate).toISOString()
+                  : null,
+                endDate: adForm.endDate
+                  ? new Date(adForm.endDate).toISOString()
+                  : null,
+                updatedAt: new Date().toISOString(),
+              }
+            : ad
+        )
+      );
+      setShowEditModal(false);
     }
   };
 
@@ -464,8 +634,8 @@ const AdvertisementsManagement = ({ user }) => {
             }}
           >
             <option value="all">Tất cả</option>
-            <option value="Hoạt động">Hoạt động</option>
-            <option value="Đã kết thúc">Đã kết thúc</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Không hoạt động</option>
           </select>
         </div>
 
@@ -508,9 +678,33 @@ const AdvertisementsManagement = ({ user }) => {
             borderRadius: "0.375rem",
             marginBottom: "1rem",
             border: "1px solid #fecaca",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          {error}
+          <span>{error}</span>
+          {apiDisabled && (
+            <button
+              onClick={() => {
+                setApiDisabled(false);
+                setError("");
+                fetchAdvertisements();
+              }}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "#dc2626",
+                color: "white",
+                border: "none",
+                borderRadius: "0.375rem",
+                fontSize: "0.875rem",
+                cursor: "pointer",
+                marginLeft: "1rem",
+              }}
+            >
+              Thử lại API
+            </button>
+          )}
         </div>
       )}
 
@@ -584,7 +778,7 @@ const AdvertisementsManagement = ({ user }) => {
           >
             {paginatedAdvertisements.map((ad) => (
               <div
-                key={ad.id}
+                key={ad._id}
                 style={{
                   border: "1px solid #e5e7eb",
                   borderRadius: "0.75rem",
@@ -596,6 +790,7 @@ const AdvertisementsManagement = ({ user }) => {
                   position: "relative",
                   overflow: "hidden",
                 }}
+                onClick={(e) => handleAdRowClick(ad, e)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow =
                     "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)";
@@ -615,8 +810,7 @@ const AdvertisementsManagement = ({ user }) => {
                     left: 0,
                     right: 0,
                     height: "4px",
-                    backgroundColor:
-                      ad.status === "Hoạt động" ? "#22c55e" : "#ef4444",
+                    backgroundColor: ad.isActive ? "#22c55e" : "#ef4444",
                   }}
                 ></div>
 
@@ -648,43 +842,45 @@ const AdvertisementsManagement = ({ user }) => {
                         borderRadius: "9999px",
                         fontSize: "0.75rem",
                         fontWeight: "500",
-                        backgroundColor: "#e0e7ff",
-                        color: "#3730a3",
+                        backgroundColor: ad.isActive ? "#f0fdf4" : "#fef2f2",
+                        color: ad.isActive ? "#166534" : "#dc2626",
                       }}
                     >
-                      {getTargetDisplay(ad.target)}
+                      {ad.isActive ? "Hoạt động" : "Không hoạt động"}
                     </span>
-                    <span
-                      style={{
-                        padding: "0.25rem 0.75rem",
-                        borderRadius: "9999px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                        backgroundColor: "#f0f9ff",
-                        color: "#1e40af",
-                      }}
-                    >
-                      {getPositionDisplay(ad.position)}
-                    </span>
-                    <span
-                      style={{
-                        padding: "0.25rem 0.75rem",
-                        borderRadius: "9999px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                        backgroundColor:
-                          ad.status === "Hoạt động" ? "#f0fdf4" : "#fef2f2",
-                        color:
-                          ad.status === "Hoạt động" ? "#166534" : "#dc2626",
-                      }}
-                    >
-                      {ad.status}
-                    </span>
+                    {ad.views && (
+                      <span
+                        style={{
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.75rem",
+                          fontWeight: "500",
+                          backgroundColor: "#f0f9ff",
+                          color: "#1e40af",
+                        }}
+                      >
+                        {ad.views} lượt xem
+                      </span>
+                    )}
+                    {ad.clicks && (
+                      <span
+                        style={{
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.75rem",
+                          fontWeight: "500",
+                          backgroundColor: "#e0e7ff",
+                          color: "#3730a3",
+                        }}
+                      >
+                        {ad.clicks} lượt click
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Image preview */}
-                {ad.imageUrl && (
+                {ad.images && ad.images.length > 0 && (
                   <div
                     style={{
                       marginBottom: "1rem",
@@ -694,14 +890,33 @@ const AdvertisementsManagement = ({ user }) => {
                     }}
                   >
                     <img
-                      src={ad.imageUrl}
+                      src={ad.images[0].url}
                       alt={ad.title}
                       style={{
                         width: "100%",
                         height: "120px",
                         objectFit: "cover",
                       }}
+                      onError={(e) => {
+                        // Fallback to a simple colored div if image fails to load
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
                     />
+                    <div
+                      style={{
+                        display: "none",
+                        width: "100%",
+                        height: "120px",
+                        backgroundColor: "#f3f4f6",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#6b7280",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      📷 Hình ảnh
+                    </div>
                   </div>
                 )}
 
@@ -719,7 +934,7 @@ const AdvertisementsManagement = ({ user }) => {
                     WebkitBoxOrient: "vertical",
                   }}
                 >
-                  {ad.description}
+                  {ad.content}
                 </div>
 
                 {/* Footer */}
@@ -773,17 +988,14 @@ const AdvertisementsManagement = ({ user }) => {
                       <FiEdit style={{ fontSize: "0.875rem" }} />
                     </button>
                     <button
-                      onClick={() => handleToggleAdvertisementStatus(ad.id)}
+                      onClick={() => handleToggleAdvertisementStatus(ad._id)}
                       style={{
                         padding: "0.5rem",
-                        backgroundColor:
-                          ad.status === "Hoạt động" ? "#fef3c7" : "#dcfce7",
-                        color:
-                          ad.status === "Hoạt động" ? "#92400e" : "#166534",
-                        border:
-                          ad.status === "Hoạt động"
-                            ? "1px solid #fbbf24"
-                            : "1px solid #10b981",
+                        backgroundColor: ad.isActive ? "#fef3c7" : "#dcfce7",
+                        color: ad.isActive ? "#92400e" : "#166534",
+                        border: ad.isActive
+                          ? "1px solid #fbbf24"
+                          : "1px solid #10b981",
                         borderRadius: "0.375rem",
                         cursor: "pointer",
                         transition: "all 0.2s ease",
@@ -791,10 +1003,10 @@ const AdvertisementsManagement = ({ user }) => {
                         fontWeight: "500",
                       }}
                     >
-                      {ad.status === "Hoạt động" ? "Ngừng" : "Kích hoạt"}
+                      {ad.isActive ? "Ngừng" : "Kích hoạt"}
                     </button>
                     <button
-                      onClick={() => handleDeleteAdvertisement(ad.id)}
+                      onClick={() => handleDeleteAdvertisement(ad._id)}
                       style={{
                         padding: "0.5rem",
                         backgroundColor: "#fef2f2",
@@ -845,12 +1057,32 @@ const AdvertisementsManagement = ({ user }) => {
             <h3>Chi tiết quảng cáo</h3>
 
             <div className="ad-preview">
-              {selectedAd.imageUrl && (
-                <img
-                  src={selectedAd.imageUrl}
-                  alt={selectedAd.title}
-                  className="ad-image"
-                />
+              {selectedAd.images && selectedAd.images.length > 0 && (
+                <div style={{ marginBottom: "1rem" }}>
+                  <img
+                    src={selectedAd.images[0].url}
+                    alt={selectedAd.title}
+                    style={{
+                      width: "100%",
+                      height: "auto",
+                      objectFit: "contain",
+                      borderRadius: "0.5rem",
+                      border: "1px solid #e5e7eb",
+                      backgroundColor: "#f9fafb",
+                    }}
+                  />
+                  {selectedAd.images.length > 1 && (
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        fontSize: "0.875rem",
+                        color: "#6b7280",
+                      }}
+                    >
+                      +{selectedAd.images.length - 1} ảnh khác
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -861,20 +1093,8 @@ const AdvertisementsManagement = ({ user }) => {
                   <td>{selectedAd.title}</td>
                 </tr>
                 <tr>
-                  <td>Mô tả</td>
-                  <td>{selectedAd.description}</td>
-                </tr>
-                <tr>
-                  <td>URL</td>
-                  <td>
-                    <a
-                      href={selectedAd.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {selectedAd.url}
-                    </a>
-                  </td>
+                  <td>Nội dung</td>
+                  <td>{selectedAd.content}</td>
                 </tr>
                 <tr>
                   <td>Thời gian hiển thị</td>
@@ -884,24 +1104,43 @@ const AdvertisementsManagement = ({ user }) => {
                   </td>
                 </tr>
                 <tr>
-                  <td>Đối tượng</td>
-                  <td>{getTargetDisplay(selectedAd.target)}</td>
-                </tr>
-                <tr>
-                  <td>Vị trí</td>
-                  <td>{getPositionDisplay(selectedAd.position)}</td>
-                </tr>
-                <tr>
                   <td>Trạng thái</td>
                   <td>
                     <span
-                      className={`status-badge ${
-                        selectedAd.status === "Hoạt động" ? "success" : ""
-                      }`}
+                      style={{
+                        padding: "0.25rem 0.75rem",
+                        borderRadius: "9999px",
+                        fontSize: "0.75rem",
+                        fontWeight: "500",
+                        backgroundColor: selectedAd.isActive
+                          ? "#f0fdf4"
+                          : "#fef2f2",
+                        color: selectedAd.isActive ? "#166534" : "#dc2626",
+                      }}
                     >
-                      {selectedAd.status}
+                      {selectedAd.isActive ? "Hoạt động" : "Không hoạt động"}
                     </span>
                   </td>
+                </tr>
+                {selectedAd.views && (
+                  <tr>
+                    <td>Lượt xem</td>
+                    <td>{selectedAd.views}</td>
+                  </tr>
+                )}
+                {selectedAd.clicks && (
+                  <tr>
+                    <td>Lượt click</td>
+                    <td>{selectedAd.clicks}</td>
+                  </tr>
+                )}
+                <tr>
+                  <td>Ngày tạo</td>
+                  <td>{formatDate(selectedAd.createdAt)}</td>
+                </tr>
+                <tr>
+                  <td>Ngày cập nhật</td>
+                  <td>{formatDate(selectedAd.updatedAt)}</td>
                 </tr>
               </tbody>
             </table>
@@ -945,40 +1184,72 @@ const AdvertisementsManagement = ({ user }) => {
               </div>
 
               <div className="form-group">
-                <label>Mô tả</label>
+                <label>Nội dung</label>
                 <textarea
                   required
-                  value={adForm.description}
+                  value={adForm.content}
                   onChange={(e) =>
-                    setAdForm({ ...adForm, description: e.target.value })
+                    setAdForm({ ...adForm, content: e.target.value })
                   }
-                  rows="3"
+                  rows="4"
                 />
               </div>
 
               <div className="form-group">
-                <label>URL</label>
+                <label>Ảnh (URL)</label>
                 <input
                   type="url"
-                  required
-                  value={adForm.url}
-                  onChange={(e) =>
-                    setAdForm({ ...adForm, url: e.target.value })
-                  }
-                  placeholder="https://example.com"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>URL ảnh</label>
-                <input
-                  type="url"
-                  value={adForm.imageUrl}
-                  onChange={(e) =>
-                    setAdForm({ ...adForm, imageUrl: e.target.value })
-                  }
                   placeholder="https://example.com/image.jpg"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setAdForm({
+                        ...adForm,
+                        images: [
+                          {
+                            url: e.target.value,
+                            public_id: "temp",
+                            format: "jpg",
+                          },
+                        ],
+                      });
+                    } else {
+                      setAdForm({ ...adForm, images: [] });
+                    }
+                  }}
                 />
+                {/* Image Preview */}
+                {adForm.images &&
+                  adForm.images.length > 0 &&
+                  adForm.images[0].url && (
+                    <div style={{ marginTop: "0.5rem" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontSize: "0.875rem",
+                          color: "#6b7280",
+                        }}
+                      >
+                        Xem trước:
+                      </label>
+                      <img
+                        src={adForm.images[0].url}
+                        alt="Preview"
+                        style={{
+                          width: "100%",
+                          maxWidth: "400px",
+                          height: "auto",
+                          objectFit: "contain",
+                          borderRadius: "0.5rem",
+                          border: "1px solid #e5e7eb",
+                          backgroundColor: "#f9fafb",
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
               </div>
 
               <div className="form-row">
@@ -986,7 +1257,6 @@ const AdvertisementsManagement = ({ user }) => {
                   <label>Ngày bắt đầu</label>
                   <input
                     type="date"
-                    required
                     value={adForm.startDate}
                     onChange={(e) =>
                       setAdForm({ ...adForm, startDate: e.target.value })
@@ -998,7 +1268,6 @@ const AdvertisementsManagement = ({ user }) => {
                   <label>Ngày kết thúc</label>
                   <input
                     type="date"
-                    required
                     value={adForm.endDate}
                     onChange={(e) =>
                       setAdForm({ ...adForm, endDate: e.target.value })
@@ -1008,37 +1277,20 @@ const AdvertisementsManagement = ({ user }) => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group half">
-                  <label>Đối tượng</label>
-                  <select
-                    required
-                    value={adForm.target}
-                    onChange={(e) =>
-                      setAdForm({ ...adForm, target: e.target.value })
-                    }
-                  >
-                    <option value="all">Tất cả</option>
-                    <option value="student">Học sinh</option>
-                    <option value="parent">Phụ huynh</option>
-                    <option value="teacher">Giáo viên</option>
-                  </select>
-                </div>
-
-                <div className="form-group half">
-                  <label>Vị trí</label>
-                  <select
-                    required
-                    value={adForm.position}
-                    onChange={(e) =>
-                      setAdForm({ ...adForm, position: e.target.value })
-                    }
-                  >
-                    <option value="homepage">Trang chủ</option>
-                    <option value="dashboard">Dashboard</option>
-                    <option value="sidebar">Sidebar</option>
-                  </select>
-                </div>
+              <div className="form-group">
+                <label>Trạng thái</label>
+                <select
+                  value={adForm.isActive}
+                  onChange={(e) =>
+                    setAdForm({
+                      ...adForm,
+                      isActive: e.target.value === "true",
+                    })
+                  }
+                >
+                  <option value="true">Hoạt động</option>
+                  <option value="false">Không hoạt động</option>
+                </select>
               </div>
 
               <div className="form-actions">
@@ -1079,40 +1331,77 @@ const AdvertisementsManagement = ({ user }) => {
               </div>
 
               <div className="form-group">
-                <label>Mô tả</label>
+                <label>Nội dung</label>
                 <textarea
                   required
-                  value={adForm.description}
+                  value={adForm.content}
                   onChange={(e) =>
-                    setAdForm({ ...adForm, description: e.target.value })
+                    setAdForm({ ...adForm, content: e.target.value })
                   }
-                  rows="3"
+                  rows="4"
                 />
               </div>
 
               <div className="form-group">
-                <label>URL</label>
+                <label>Ảnh (URL)</label>
                 <input
                   type="url"
-                  required
-                  value={adForm.url}
-                  onChange={(e) =>
-                    setAdForm({ ...adForm, url: e.target.value })
-                  }
-                  placeholder="https://example.com"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>URL ảnh</label>
-                <input
-                  type="url"
-                  value={adForm.imageUrl}
-                  onChange={(e) =>
-                    setAdForm({ ...adForm, imageUrl: e.target.value })
-                  }
                   placeholder="https://example.com/image.jpg"
+                  defaultValue={
+                    adForm.images && adForm.images[0]
+                      ? adForm.images[0].url
+                      : ""
+                  }
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setAdForm({
+                        ...adForm,
+                        images: [
+                          {
+                            url: e.target.value,
+                            public_id: "temp",
+                            format: "jpg",
+                          },
+                        ],
+                      });
+                    } else {
+                      setAdForm({ ...adForm, images: [] });
+                    }
+                  }}
                 />
+                {/* Image Preview */}
+                {adForm.images &&
+                  adForm.images.length > 0 &&
+                  adForm.images[0].url && (
+                    <div style={{ marginTop: "0.5rem" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontSize: "0.875rem",
+                          color: "#6b7280",
+                        }}
+                      >
+                        Xem trước:
+                      </label>
+                      <img
+                        src={adForm.images[0].url}
+                        alt="Preview"
+                        style={{
+                          width: "100%",
+                          maxWidth: "400px",
+                          height: "auto",
+                          objectFit: "contain",
+                          borderRadius: "0.5rem",
+                          border: "1px solid #e5e7eb",
+                          backgroundColor: "#f9fafb",
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
               </div>
 
               <div className="form-row">
@@ -1120,7 +1409,6 @@ const AdvertisementsManagement = ({ user }) => {
                   <label>Ngày bắt đầu</label>
                   <input
                     type="date"
-                    required
                     value={adForm.startDate}
                     onChange={(e) =>
                       setAdForm({ ...adForm, startDate: e.target.value })
@@ -1132,7 +1420,6 @@ const AdvertisementsManagement = ({ user }) => {
                   <label>Ngày kết thúc</label>
                   <input
                     type="date"
-                    required
                     value={adForm.endDate}
                     onChange={(e) =>
                       setAdForm({ ...adForm, endDate: e.target.value })
@@ -1142,50 +1429,19 @@ const AdvertisementsManagement = ({ user }) => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group half">
-                  <label>Đối tượng</label>
-                  <select
-                    required
-                    value={adForm.target}
-                    onChange={(e) =>
-                      setAdForm({ ...adForm, target: e.target.value })
-                    }
-                  >
-                    <option value="all">Tất cả</option>
-                    <option value="student">Học sinh</option>
-                    <option value="parent">Phụ huynh</option>
-                    <option value="teacher">Giáo viên</option>
-                  </select>
-                </div>
-
-                <div className="form-group half">
-                  <label>Vị trí</label>
-                  <select
-                    required
-                    value={adForm.position}
-                    onChange={(e) =>
-                      setAdForm({ ...adForm, position: e.target.value })
-                    }
-                  >
-                    <option value="homepage">Trang chủ</option>
-                    <option value="dashboard">Dashboard</option>
-                    <option value="sidebar">Sidebar</option>
-                  </select>
-                </div>
-              </div>
-
               <div className="form-group">
                 <label>Trạng thái</label>
                 <select
-                  required
-                  value={adForm.status}
+                  value={adForm.isActive}
                   onChange={(e) =>
-                    setAdForm({ ...adForm, status: e.target.value })
+                    setAdForm({
+                      ...adForm,
+                      isActive: e.target.value === "true",
+                    })
                   }
                 >
-                  <option value="Hoạt động">Hoạt động</option>
-                  <option value="Đã kết thúc">Đã kết thúc</option>
+                  <option value="true">Hoạt động</option>
+                  <option value="false">Không hoạt động</option>
                 </select>
               </div>
 

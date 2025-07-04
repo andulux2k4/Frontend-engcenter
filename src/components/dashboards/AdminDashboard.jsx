@@ -14,6 +14,7 @@ import TuitionManagement from "./components/TuitionManagement";
 import SalaryManagement from "./components/SalaryManagement";
 import NotificationsManagement from "./components/NotificationsManagement";
 import AdvertisementsManagement from "./components/AdvertisementsManagement";
+import AutoNotificationsManagement from "./components/AutoNotificationsManagement";
 import TeacherSelectionModal from "./components/modals/TeacherSelectionModal";
 import StudentSelectionModal from "./components/modals/StudentSelectionModal";
 import UserDetailModal from "./components/modals/UserDetailModal";
@@ -22,8 +23,6 @@ import UserFormModal from "./components/modals/UserFormModal";
 import ClassDetailModal from "./components/modals/ClassDetailModal";
 
 function AdminDashboard({ user, onLogout }) {
-  console.log("🏢 AdminDashboard rendered with user:", user);
-
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -180,8 +179,6 @@ function AdminDashboard({ user, onLogout }) {
 
       // Backend returns: {msg, data, pagination} instead of {success, users, pagination}
       if (response.data && Array.isArray(response.data)) {
-        console.log("📋 Raw user data from API:", response.data[0]); // Log first user to see structure
-
         // Map the API response to match the UI structure
         const mappedUsers = response.data.map((user) => {
           // Xác định roleId dựa trên vai trò người dùng
@@ -226,12 +223,6 @@ function AdminDashboard({ user, onLogout }) {
           // Nếu vẫn chưa có roleId, đánh dấu là null - không sử dụng ID chính làm fallback nữa
           // vì điều này có thể gây ra lỗi khi gọi API
 
-          console.log(
-            `User ${user.name || user.userId?.name} (${
-              user.role
-            }) has roleId: ${roleId || "NOT_FOUND"}`
-          );
-
           return {
             id: user._id || user.id,
             roleId: roleId, // Có thể null
@@ -254,8 +245,6 @@ function AdminDashboard({ user, onLogout }) {
             wagePerLesson: user.wagePerLesson || 0, // Teacher có wagePerLesson
           };
         });
-
-        console.log("🔄 Mapped user data:", mappedUsers[0]); // Log mapped data
 
         setUsers(mappedUsers);
         if (response.pagination) {
@@ -326,13 +315,36 @@ function AdminDashboard({ user, onLogout }) {
           grade: cls.grade || 1,
           isAvailable: cls.isAvailable !== false,
           status: cls.isAvailable ? "Đang học" : "Đã kết thúc",
+          // Use API teacherName directly if available
+          teacher: cls.teacherName
+            ? {
+                name: cls.teacherName,
+              }
+            : cls.teacherId
+            ? {
+                _id: cls.teacherId._id || cls.teacherId.id,
+                name:
+                  cls.teacherId.name ||
+                  cls.teacherId.userId?.name ||
+                  "Chưa có tên",
+                email: cls.teacherId.email || cls.teacherId.userId?.email || "",
+                phone:
+                  cls.teacherId.phone ||
+                  cls.teacherId.userId?.phoneNumber ||
+                  "",
+              }
+            : null,
+          // Use API teacherName directly
           teacherName:
+            cls.teacherName ||
             cls.teacherId?.name ||
             cls.teacherId?.userId?.name ||
             "Chưa phân công",
           teacherEmail:
             cls.teacherId?.email || cls.teacherId?.userId?.email || "",
-          currentStudents: cls.studentList?.length || 0,
+          // Use API studentCount directly
+          studentCount: cls.studentCount || cls.studentList?.length || 0,
+          currentStudents: cls.studentCount || cls.studentList?.length || 0,
           maxStudents: cls.maxStudents || 20,
           feePerLesson: cls.feePerLesson || 0,
           schedule: cls.schedule || {},
@@ -769,7 +781,6 @@ function AdminDashboard({ user, onLogout }) {
   const handleViewUserDetail = async (userSummary) => {
     if (!user?.token) return;
 
-    console.log("🔍 Viewing user detail for user:", userSummary);
     setShowUserDetail(true);
     setUserDetailLoading(true);
     setSelectedUserDetail(null);
@@ -781,15 +792,11 @@ function AdminDashboard({ user, onLogout }) {
       // User ID - là ID trong bảng users
       const userId = userSummary.id;
 
-      console.log(
-        `🔍 Role: ${userSummary.role}, UserID: ${userId}, RoleID: ${roleId}`
-      );
-
       // Xác định nên sử dụng API endpoint nào
       let useRoleSpecificEndpoint = false;
 
       if (roleId) {
-        // Chỉ sử dụng role-specific endpoint khi có roleId
+        // Chỉ sử dụng roleId khi có giá trị
         useRoleSpecificEndpoint = true;
       } else {
         console.warn(
@@ -806,7 +813,6 @@ function AdminDashboard({ user, onLogout }) {
       );
 
       if (response.success && response.data) {
-        console.log("✅ User detail loaded successfully:", response.data);
         // Đảm bảo role được truyền đúng từ userSummary vào selectedUserDetail
         const userDetailWithRole = {
           ...response.data,
@@ -816,9 +822,54 @@ function AdminDashboard({ user, onLogout }) {
         setSelectedUserDetail(userDetailWithRole);
       } else {
         console.error("❌ Failed to load user details:", response);
-        setError(
-          response.message || "Không thể tải thông tin chi tiết người dùng"
-        );
+
+        // Check if the user is disabled
+        if (response.error === "USER_DISABLED" || response.isDisabled) {
+          setError(
+            "Người dùng này đã bị vô hiệu hóa và không thể xem chi tiết."
+          );
+          // Still show summary data but with disabled indicator
+          setSelectedUserDetail({
+            ...userSummary,
+            originalRole: userSummary.role,
+            role: userSummary.role,
+            isDisabled: true,
+            disabledMessage: "Người dùng đã bị vô hiệu hóa",
+          });
+        } else {
+          setError(
+            response.message || "Không thể tải thông tin chi tiết người dùng"
+          );
+          // Fallback to summary data with role preserved
+          setSelectedUserDetail({
+            ...userSummary,
+            originalRole: userSummary.role,
+            role: userSummary.role,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error loading user details:", error);
+
+      // Check if the error is due to a disabled user
+      const errorMessage = error.message || "";
+      const isDisabledUser =
+        errorMessage.includes("đã bị vô hiệu hóa") ||
+        errorMessage.includes("disabled") ||
+        errorMessage.includes("deactivated");
+
+      if (isDisabledUser) {
+        setError("Người dùng này đã bị vô hiệu hóa và không thể xem chi tiết.");
+        // Show summary data with disabled indicator
+        setSelectedUserDetail({
+          ...userSummary,
+          originalRole: userSummary.role,
+          role: userSummary.role,
+          isDisabled: true,
+          disabledMessage: "Người dùng đã bị vô hiệu hóa",
+        });
+      } else {
+        setError("Lỗi kết nối. Đang hiển thị thông tin cơ bản.");
         // Fallback to summary data with role preserved
         setSelectedUserDetail({
           ...userSummary,
@@ -826,15 +877,6 @@ function AdminDashboard({ user, onLogout }) {
           role: userSummary.role,
         });
       }
-    } catch (error) {
-      console.error("❌ Error loading user details:", error);
-      setError("Lỗi kết nối. Đang hiển thị thông tin cơ bản.");
-      // Fallback to summary data with role preserved
-      setSelectedUserDetail({
-        ...userSummary,
-        originalRole: userSummary.role,
-        role: userSummary.role,
-      });
     } finally {
       setUserDetailLoading(false);
     }
@@ -853,10 +895,6 @@ function AdminDashboard({ user, onLogout }) {
       const roleId = userSummary.roleId;
       // User ID - là ID trong bảng users
       const userId = userSummary.id;
-
-      console.log(
-        `🔍 Edit user - Role: ${userSummary.role}, UserID: ${userId}, RoleID: ${roleId}`
-      );
 
       // Always use role-specific endpoint since general /users endpoint doesn't exist
       let response;
@@ -884,8 +922,7 @@ function AdminDashboard({ user, onLogout }) {
         // Cập nhật form data với thông tin chi tiết từ API
         const userData = response.data;
 
-        console.log("🔍 Raw userData from API for editing:", userData);
-        console.log("🔍 User role:", userSummary.role);
+        // 🏷️ Form data loaded for editing
 
         // Extract class IDs from various possible formats
         let classIds = [];
@@ -910,13 +947,6 @@ function AdminDashboard({ user, onLogout }) {
           // Nếu classId là string đơn
           classIds = [userData.classId];
         }
-
-        console.log("🔍 Debug classIds extraction:", {
-          classId: userData.classId,
-          currentClasses: userData.currentClasses,
-          classIds: userData.classIds,
-          extractedClassIds: classIds,
-        });
 
         // Extract student IDs for parent role - theo model Parent có childId (array)
         let studentIds = [];
@@ -947,13 +977,6 @@ function AdminDashboard({ user, onLogout }) {
           // Fallback cho trường hợp API trả về studentIds
           studentIds = userData.studentIds;
         }
-
-        console.log("🔍 Debug studentIds extraction:", {
-          childId: userData.childId,
-          children: userData.children,
-          studentIds: userData.studentIds,
-          extractedStudentIds: studentIds,
-        });
 
         // Extract parent ID for student role
         let parentId = "";
@@ -997,23 +1020,6 @@ function AdminDashboard({ user, onLogout }) {
           name: userData.name || userData.userId?.name || userSummary.name,
         });
         setError(""); // Clear any previous errors
-
-        console.log("📝 Form data loaded for editing:", {
-          name: userData.name || userData.userId?.name || userSummary.name,
-          role: userSummary.role,
-          classIds: classIds,
-          studentIds: studentIds,
-          parentId: parentId,
-          rawUserData: userData, // Thêm raw data để debug
-          finalFormData: {
-            classIds: classIds,
-            studentIds: studentIds,
-            parentId: parentId,
-            canViewTeacher:
-              userData.canViewTeacher || userData.canSeeTeacher || false,
-            wagePerLesson: userData.wagePerLesson || 100000,
-          },
-        });
       } else {
         // Fallback to summary data if API fails
         console.warn("API failed, using summary data:", response.message);
@@ -1039,7 +1045,7 @@ function AdminDashboard({ user, onLogout }) {
           roleId: userSummary.roleId,
         });
         // Only show warning, not error, since we have fallback data
-        console.log(
+        console.warn(
           "⚠️ Đang sử dụng thông tin cơ bản do API chi tiết không khả dụng. Có thể chỉnh sửa các trường cơ bản."
         );
       }
@@ -1070,7 +1076,7 @@ function AdminDashboard({ user, onLogout }) {
       if (err.message.includes("fetch") || err.message.includes("network")) {
         setError("Lỗi kết nối mạng. Đang sử dụng thông tin cơ bản.");
       } else {
-        console.log(
+        console.warn(
           "Đang sử dụng thông tin cơ bản do API chi tiết không khả dụng"
         );
       }
@@ -1113,7 +1119,7 @@ function AdminDashboard({ user, onLogout }) {
 
       // Backend returns: {msg, data} instead of {success, data}
       if (response.msg && response.msg.includes("thành công")) {
-        console.log("✅ User deleted successfully");
+        // ✅ User deleted successfully
         loadUsers(); // Refresh the user list
       } else {
         console.error("❌ Delete failed:", response.msg);
@@ -1147,7 +1153,7 @@ function AdminDashboard({ user, onLogout }) {
         // Convert phone -> phoneNumber để phù hợp với User model
         if (formData.phone) {
           updateData.phoneNumber = formData.phone;
-          console.log("📱 Converting phone → phoneNumber:", formData.phone);
+          // Console log removed
         }
 
         // Thêm các trường theo role và convert field names theo model
@@ -1176,7 +1182,7 @@ function AdminDashboard({ user, onLogout }) {
           // Convert classIds thành classId cho Teacher
           if (formData.classIds && formData.classIds.length > 0) {
             updateData.classId = formData.classIds; // Theo model Teacher: classId array
-            console.log("🏫 Teacher classId converted:", formData.classIds);
+            // Console log removed
           }
         }
 
@@ -1184,7 +1190,7 @@ function AdminDashboard({ user, onLogout }) {
           // Convert classIds thành classId cho Student
           if (formData.classIds && formData.classIds.length > 0) {
             updateData.classId = formData.classIds; // Theo model Student: classId array
-            console.log("📚 Student classId converted:", formData.classIds);
+            // Console log removed
           }
 
           // Convert parentId cho Student
@@ -1222,6 +1228,7 @@ function AdminDashboard({ user, onLogout }) {
           return;
         }
 
+        // Try role-specific endpoint first
         response = await apiService.updateUser(
           user.token,
           editingUser.id,
@@ -1229,6 +1236,30 @@ function AdminDashboard({ user, onLogout }) {
           formData.role, // Truyền role
           editingUser.roleId // Truyền roleId nếu có
         );
+
+        // If parent update failed, try fallback with general endpoint
+        if (!response.success && formData.role === "Parent") {
+          console.warn(
+            "⚠️ Parent-specific update failed, trying general endpoint..."
+          );
+
+          // Use basic fields only for general endpoint
+          const basicUpdateData = {
+            name: formData.name,
+            email: formData.email,
+            phoneNumber: formData.phone,
+            address: formData.address,
+            gender: formData.gender,
+          };
+
+          response = await apiService.updateUser(
+            user.token,
+            editingUser.id,
+            basicUpdateData,
+            null, // Use general endpoint
+            null
+          );
+        }
       } else {
         // Tạo user mới - cũng cần convert IDs
         const createData = { ...formData };
@@ -1237,7 +1268,7 @@ function AdminDashboard({ user, onLogout }) {
         if (createData.phone) {
           createData.phoneNumber = createData.phone;
           delete createData.phone; // Xóa field cũ
-          console.log("📱 Converting phone → phoneNumber:", formData.phone);
+          // Console log removed
         }
 
         // Thêm các trường theo role cho user mới và convert field names theo model
@@ -1269,7 +1300,7 @@ function AdminDashboard({ user, onLogout }) {
           if (createData.classIds && createData.classIds.length > 0) {
             createData.classId = createData.classIds; // Theo model Teacher: classId array
             delete createData.classIds; // Xóa field cũ
-            console.log("🏫 New Teacher classId converted:", formData.classIds);
+            // Console log removed
           }
         }
 
@@ -1278,7 +1309,7 @@ function AdminDashboard({ user, onLogout }) {
           if (createData.classIds && createData.classIds.length > 0) {
             createData.classId = createData.classIds; // Theo model Student: classId array
             delete createData.classIds; // Xóa field cũ
-            console.log("📚 New Student classId converted:", formData.classIds);
+            // Console log removed
           }
 
           // Convert parentId cho Student
@@ -1365,7 +1396,7 @@ function AdminDashboard({ user, onLogout }) {
       const response = await apiService.getClassById(user.token, classId);
       if (response.data) {
         const classData = response.data;
-        console.log("Class data from API:", classData);
+        // Console log removed
 
         // Extract the teacherId (for user details view)
         let teacherId = null;
@@ -1427,6 +1458,23 @@ function AdminDashboard({ user, onLogout }) {
           isAvailable: classData.isAvailable !== false,
           status: classData.isAvailable ? "Đang học" : "Đã kết thúc",
           teacherId: teacherId, // Store the teacher ID object for user details
+          teacher: classData.teacherId
+            ? {
+                _id: classData.teacherId._id || classData.teacherId.id,
+                name:
+                  classData.teacherId.name ||
+                  classData.teacherId.userId?.name ||
+                  "Chưa có tên",
+                email:
+                  classData.teacherId.email ||
+                  classData.teacherId.userId?.email ||
+                  "",
+                phone:
+                  classData.teacherId.phone ||
+                  classData.teacherId.userId?.phoneNumber ||
+                  "",
+              }
+            : null,
           teacherName:
             classData.teacherId?.name ||
             classData.teacherId?.userId?.name ||
@@ -1439,6 +1487,7 @@ function AdminDashboard({ user, onLogout }) {
             classData.teacherId?.phoneNumber ||
             classData.teacherId?.userId?.phoneNumber ||
             "",
+          studentCount: classData.studentList?.length || 0,
           currentStudents: classData.studentList?.length || 0,
           maxStudents: classData.maxStudents || 20,
           feePerLesson: classData.feePerLesson || 0,
@@ -1647,7 +1696,7 @@ function AdminDashboard({ user, onLogout }) {
         });
         setParents(mappedParents);
       } else {
-        console.log("⚠️ No parents data received:", parentsRes);
+        // Console log removed
         setParents([]);
       }
 
@@ -1721,8 +1770,6 @@ function AdminDashboard({ user, onLogout }) {
 
   // Handle role filter change
   const handleRoleFilterChange = async (newRole) => {
-    console.log(`🔍 Changing filter from "${selectedRole}" to "${newRole}"`);
-
     // Reset pagination first
     const newPagination = {
       ...pagination,
@@ -1745,7 +1792,7 @@ function AdminDashboard({ user, onLogout }) {
           filters.role = newRole.charAt(0).toUpperCase() + newRole.slice(1);
         }
 
-        console.log(`📋 Loading users with filter:`, filters, `page: 1`);
+        // 📋 Loading users with filter
 
         const response = await apiService.getUsers(
           user.token,
@@ -1807,6 +1854,7 @@ function AdminDashboard({ user, onLogout }) {
   const handleCreateClass = async () => {
     if (!user?.token) return;
 
+    console.log("🏫 Starting class creation process...");
     setLoading(true);
 
     try {
@@ -1822,6 +1870,7 @@ function AdminDashboard({ user, onLogout }) {
       const missingFields = requiredFields.filter((field) => !newClass[field]);
 
       if (missingFields.length > 0) {
+        console.error("❌ Missing required fields:", missingFields);
         setError(`Vui lòng điền đầy đủ thông tin: ${missingFields.join(", ")}`);
         setLoading(false);
         return;
@@ -1857,10 +1906,21 @@ function AdminDashboard({ user, onLogout }) {
         isAvailable: true,
       };
 
+      console.log("🚀 Sending POST request to /v1/api/classes with data:", {
+        endpoint: "/v1/api/classes",
+        method: "POST",
+        formData: newClass,
+        processedData: classData,
+      });
+
       const response = await apiService.createClass(user.token, classData);
+
+      console.log("📥 Received response from createClass API:", response);
 
       // Backend returns: {msg, data} instead of {success, data}
       if (response.msg && response.msg.includes("thành công")) {
+        console.log("✅ Class created successfully:", response.data);
+
         // Reset the form
         setNewClass({
           name: "",
@@ -1877,12 +1937,98 @@ function AdminDashboard({ user, onLogout }) {
         setShowNewClassModal(false);
 
         // Reload classes list
+        console.log("🔄 Reloading classes list...");
         loadClasses();
       } else {
+        console.error("❌ Class creation failed:", response.msg || response);
         setError(response.msg || "Không thể tạo lớp học mới");
       }
     } catch (error) {
-      console.error("Error creating class:", error);
+      console.error("💥 Error creating class:", error);
+      setError("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle updating an existing class
+  const handleUpdateClass = async () => {
+    if (!user?.token || !editClassData.id) return;
+
+    setLoading(true);
+
+    try {
+      // Validate required fields
+      const requiredFields = [
+        "name",
+        "year",
+        "grade",
+        "startDate",
+        "endDate",
+        "feePerLesson",
+      ];
+      const missingFields = requiredFields.filter(
+        (field) => !editClassData[field]
+      );
+
+      if (missingFields.length > 0) {
+        setError(`Vui lòng điền đầy đủ thông tin: ${missingFields.join(", ")}`);
+        setLoading(false);
+        return;
+      }
+
+      // Prepare data for API
+      // Convert day names to numbers (0 = Monday, 1 = Tuesday, etc.)
+      const dayToNumberMap = {
+        Monday: 0,
+        Tuesday: 1,
+        Wednesday: 2,
+        Thursday: 3,
+        Friday: 4,
+        Saturday: 5,
+        Sunday: 6,
+      };
+
+      const daysAsNumbers = editClassData.daysOfLessonInWeek.map((day) => {
+        if (typeof day === "number") return day;
+        return dayToNumberMap[day];
+      });
+
+      const classData = {
+        className: editClassData.name,
+        year: parseInt(editClassData.year),
+        grade: parseInt(editClassData.grade),
+        teacherId: editClassData.teacherId || null,
+        feePerLesson: parseInt(editClassData.feePerLesson),
+        schedule: {
+          startDate: editClassData.startDate,
+          endDate: editClassData.endDate,
+          daysOfLessonInWeek: daysAsNumbers,
+        },
+      };
+
+      // ✅ Updating class
+      const classId = editClassData.id;
+      const response = await apiService.updateClass(
+        user.token,
+        classId,
+        classData
+      );
+
+      // ✅ Update class response
+
+      // Backend returns: {msg, data} instead of {success, data}
+      if (response.msg && response.msg.includes("thành công")) {
+        // Close the modal
+        setShowEditClass(false);
+
+        // Reload classes list
+        loadClasses();
+      } else {
+        setError(response.msg || "Không thể cập nhật lớp học");
+      }
+    } catch (error) {
+      console.error("Error updating class:", error);
       setError("Lỗi kết nối. Vui lòng thử lại.");
     } finally {
       setLoading(false);
@@ -1971,6 +2117,15 @@ function AdminDashboard({ user, onLogout }) {
             </button>
             <button
               className={`nav-item ${
+                activeTab === "auto-notifications" ? "active" : ""
+              }`}
+              onClick={() => setActiveTab("auto-notifications")}
+            >
+              <MdNotifications className="icon" />
+              Tin nhắn tự động
+            </button>
+            <button
+              className={`nav-item ${
                 activeTab === "advertisements" ? "active" : ""
               }`}
               onClick={() => setActiveTab("advertisements")}
@@ -1994,6 +2149,7 @@ function AdminDashboard({ user, onLogout }) {
               filteredUsers={filteredUsers}
               loading={loading}
               error={error}
+              setError={setError}
               pagination={pagination}
               setPagination={setPagination}
               userFilters={userFilters}
@@ -2029,6 +2185,7 @@ function AdminDashboard({ user, onLogout }) {
               classes={classes}
               loading={loading}
               error={error}
+              setError={setError}
               classPagination={classPagination}
               setClassPagination={setClassPagination}
               classFilters={classFilters}
@@ -2068,6 +2225,10 @@ function AdminDashboard({ user, onLogout }) {
 
           {activeTab === "notifications" && (
             <NotificationsManagement user={user} />
+          )}
+
+          {activeTab === "auto-notifications" && (
+            <AutoNotificationsManagement user={user} />
           )}
 
           {activeTab === "advertisements" && (
@@ -2129,8 +2290,10 @@ function AdminDashboard({ user, onLogout }) {
         classData={editClassData}
         setClassData={setEditClassData}
         allTeachers={allTeachers}
-        handleSubmit={() => handleClassEdit(editClassData.id)}
+        handleSubmit={handleUpdateClass}
         loading={loading}
+        user={user}
+        setError={setError}
       />
 
       {/* User Form Modal - for adding/editing users */}

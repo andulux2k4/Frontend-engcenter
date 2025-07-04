@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import apiService from "../../../services/api";
 
 const Overview = ({ user }) => {
-  console.log("📊 Overview component rendered with user:", user);
-
   const [stats, setStats] = useState({
     // System Overview
     totalUsers: 0,
@@ -69,14 +67,10 @@ const Overview = ({ user }) => {
     const loadFilterData = async () => {
       try {
         if (user?.token) {
-          console.log("🔍 Loading filter data...");
           const [teachersResponse, classesResponse] = await Promise.all([
             apiService.getUsers(user.token, { role: "teacher" }),
             apiService.getClasses(user.token),
           ]);
-
-          console.log("👨‍🏫 Teachers response:", teachersResponse);
-          console.log("🏫 Classes response:", classesResponse);
 
           if (teachersResponse.data) {
             setTeachers(teachersResponse.data);
@@ -97,11 +91,10 @@ const Overview = ({ user }) => {
   useEffect(() => {
     const loadStatistics = async () => {
       if (!user?.token) {
-        console.log("⚠️ No user token available for statistics");
+        console.warn("⚠️ No user token available for statistics");
         return;
       }
 
-      console.log("📊 Loading statistics with filters:", filters);
       setLoading(true);
       setError(null);
 
@@ -118,10 +111,8 @@ const Overview = ({ user }) => {
           user.token,
           statisticsFilters
         );
-        console.log("📈 Statistics API response:", response);
 
         const responseData = response.data || response;
-        console.log("📊 Response data structure:", responseData);
 
         // More flexible validation - check if we have data regardless of success flag
         let apiData = null;
@@ -133,8 +124,6 @@ const Overview = ({ user }) => {
         }
 
         if (apiData) {
-          console.log("📊 Processing API data:", apiData);
-
           // Get current month data for growth
           const currentMonth = new Date().getMonth() + 1;
           const currentYear = new Date().getFullYear();
@@ -213,7 +202,6 @@ const Overview = ({ user }) => {
             netGrowthThisMonth: currentMonthGrowth.netGrowth || 0,
           };
 
-          console.log("✅ Setting stats:", newStats);
           setStats(newStats);
         } else {
           throw new Error("Invalid response format");

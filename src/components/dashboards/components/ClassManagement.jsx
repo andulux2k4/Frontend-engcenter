@@ -21,6 +21,7 @@ const ClassManagement = ({
   classes,
   loading,
   error,
+  setError,
   classPagination,
   setClassPagination,
   classFilters,
@@ -504,7 +505,11 @@ const ClassManagement = ({
                       <span>
                         <FiUsers style={{ color: "#ec4899" }} /> Giáo viên:
                       </span>
-                      <span>{classItem.teacherName || "Chưa phân công"}</span>
+                      <span>
+                        {classItem.teacher && classItem.teacher.name
+                          ? classItem.teacher.name
+                          : "Chưa phân công"}
+                      </span>
                     </p>
 
                     <p>
@@ -512,7 +517,9 @@ const ClassManagement = ({
                         <FiUsers style={{ color: "#0ea5e9" }} /> Học sinh:
                       </span>
                       <span>
-                        {classItem.currentStudents}/{classItem.maxStudents}
+                        {typeof classItem.studentCount === "number"
+                          ? classItem.studentCount
+                          : 0}
                       </span>
                     </p>
 
@@ -782,6 +789,8 @@ const ClassManagement = ({
         allTeachers={allTeachers}
         handleSubmit={handleCreateClass}
         loading={loading}
+        user={user}
+        setError={setError}
       />
     </section>
   );
