@@ -27,12 +27,12 @@ const mockTeacherWages = [
     sessionsCount: 20,
     wagePerSession: 200000,
     totalWage: 4000000,
-    paidAmount: 2000000,
-    remainingAmount: 2000000,
+    paidAmount: 4000000,
+    remainingAmount: 0,
     month: 3,
     year: 2024,
-    paymentStatus: "partial",
-    paymentDate: null,
+    paymentStatus: "paid",
+    paymentDate: "2024-03-15",
     createdAt: "2024-03-01",
     updatedAt: "2024-03-15",
   },
@@ -45,12 +45,12 @@ const mockTeacherWages = [
     sessionsCount: 18,
     wagePerSession: 180000,
     totalWage: 3240000,
-    paidAmount: 0,
-    remainingAmount: 3240000,
+    paidAmount: 3240000,
+    remainingAmount: 0,
     month: 3,
     year: 2024,
-    paymentStatus: "unpaid",
-    paymentDate: null,
+    paymentStatus: "paid",
+    paymentDate: "2024-03-14",
     createdAt: "2024-03-01",
     updatedAt: "2024-03-14",
   },
@@ -127,8 +127,8 @@ const SalaryManagement = ({ user }) => {
 
   // Filter states
   const [filters, setFilters] = useState({
-    month: "", // Empty means "all months"
-    year: "", // Empty means "all years"
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
     teacherId: "",
     paymentStatus: "",
     searchTerm: "",
@@ -160,32 +160,16 @@ const SalaryManagement = ({ user }) => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [showCalculateModal, setShowCalculateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editData, setEditData] = useState(null);
 
   // Fetch teachers list
   const fetchTeachers = useCallback(async () => {
-    if (!user?.token) return;
-
     try {
-      const response = await apiService.getTeachers(user.token, 1, 100);
-
-      if (response.data) {
-        // Transform the API response to match our component structure
-        const transformedTeachers = response.data.map((teacher) => ({
-          id: teacher._id,
-          name: teacher.userId?.name || "Unknown Teacher",
-          email: teacher.userId?.email || "",
-          phoneNumber: teacher.userId?.phoneNumber || "",
-          wagePerLesson: teacher.wagePerLesson || 0,
-        }));
-
-        setTeachersList(transformedTeachers);
-      }
+      // TODO: Replace with actual API call
+      // const response = await apiService.getTeachers(user.token);
+      // setTeachersList(response.data);
+      setTeachersList(mockTeachers);
     } catch (error) {
       console.error("Error fetching teachers:", error);
-      // Fallback to mock data if API fails
-      setTeachersList(mockTeachers);
     }
   }, [user]);
 
@@ -197,121 +181,125 @@ const SalaryManagement = ({ user }) => {
     setError("");
 
     try {
-      // Real API call with filters - clean up undefined values
-      const apiFilters = {};
+      // TODO: Replace with actual API call
+      // const params = {
+      //   month: filters.month,
+      //   year: filters.year,
+      //   teacherId: filters.teacherId || undefined,
+      //   paymentStatus: filters.paymentStatus || undefined,
+      //   page: pagination.page,
+      //   limit: pagination.limit,
+      //   sort: `${filters.sortBy}:${filters.sortOrder}`,
+      //   includeList: true,
+      //   includeStats: true
+      // };
+      // const response = await apiService.getTeacherWages(user.token, params);
 
-      // Only add parameters that have actual values
-      if (filters.month) apiFilters.month = filters.month;
-      if (filters.year) apiFilters.year = filters.year;
-      if (filters.teacherId) apiFilters.teacherId = filters.teacherId;
-      if (filters.paymentStatus)
-        apiFilters.paymentStatus = filters.paymentStatus;
+      // Mock implementation
+      setTimeout(() => {
+        let filteredData = [...mockTeacherWages];
 
-      // Add other parameters
-      apiFilters.includeList = true;
-      apiFilters.includeStats = true;
+        // Apply filters
+        if (filters.month) {
+          filteredData = filteredData.filter(
+            (item) => item.month === parseInt(filters.month)
+          );
+        }
+        if (filters.year) {
+          filteredData = filteredData.filter(
+            (item) => item.year === parseInt(filters.year)
+          );
+        }
+        if (filters.teacherId) {
+          filteredData = filteredData.filter(
+            (item) => item.teacherId === filters.teacherId
+          );
+        }
+        if (filters.paymentStatus) {
+          filteredData = filteredData.filter(
+            (item) => item.paymentStatus === filters.paymentStatus
+          );
+        }
+        if (filters.searchTerm) {
+          filteredData = filteredData.filter(
+            (item) =>
+              item.teacherName
+                .toLowerCase()
+                .includes(filters.searchTerm.toLowerCase()) ||
+              item.teacherEmail
+                .toLowerCase()
+                .includes(filters.searchTerm.toLowerCase())
+          );
+        }
 
-      console.log("API Filters being sent:", apiFilters);
+        // Apply sorting
+        filteredData.sort((a, b) => {
+          let aValue = a[filters.sortBy];
+          let bValue = b[filters.sortBy];
 
-      const response = await apiService.getTeacherWages(
-        user.token,
-        pagination.page,
-        pagination.limit,
-        apiFilters
-      );
+          if (filters.sortBy === "teacherName") {
+            aValue = a.teacherName;
+            bValue = b.teacherName;
+          }
 
-      console.log("API Response:", response);
+          if (typeof aValue === "string") {
+            aValue = aValue.toLowerCase();
+            bValue = bValue.toLowerCase();
+          }
 
-      if (response.data) {
-        // Transform API response to match our component structure
-        const transformedData = response.data.map((item) => ({
-          id: item.id || item._id,
-          teacherId: item.teacherId?._id || item.teacherId,
-          teacherName: item.teacherId?.userId?.name || "Unknown Teacher",
-          teacherEmail: item.teacherId?.userId?.email || "",
-          teacherPhone: item.teacherId?.userId?.phoneNumber || "",
-          sessionsCount: item.lessonTaught || 0,
-          wagePerSession: item.teacherId?.wagePerLesson || 0,
-          totalWage: item.calculatedAmount || item.amount || 0,
-          paidAmount: Math.max(
-            0,
-            (item.calculatedAmount || item.amount || 0) -
-              (item.remainingAmount || 0)
-          ),
-          remainingAmount: item.remainingAmount || 0,
-          month: item.month,
-          year: item.year,
-          paymentStatus:
-            item.paymentStatus === "full"
-              ? "paid"
-              : item.paymentStatus === "partial"
-              ? "partial"
-              : "unpaid",
-          paymentDate: item.paymentDate || null,
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-          className: item.classId?.className || "",
-          grade: item.classId?.grade || "",
+          if (filters.sortOrder === "asc") {
+            return aValue > bValue ? 1 : -1;
+          } else {
+            return aValue < bValue ? 1 : -1;
+          }
+        });
+
+        // Calculate stats
+        const totalWages = filteredData.reduce(
+          (sum, item) => sum + item.totalWage,
+          0
+        );
+        const totalPaid = filteredData.reduce(
+          (sum, item) => sum + item.paidAmount,
+          0
+        );
+        const totalRemaining = filteredData.reduce(
+          (sum, item) => sum + item.remainingAmount,
+          0
+        );
+        const paidTeachers = filteredData.filter(
+          (item) => item.paymentStatus === "paid"
+        ).length;
+        const unpaidTeachers = filteredData.filter(
+          (item) => item.paymentStatus === "unpaid"
+        ).length;
+
+        setStats({
+          totalWages,
+          totalPaid,
+          totalRemaining,
+          totalTeachers: filteredData.length,
+          paidTeachers,
+          unpaidTeachers,
+        });
+
+        // Apply pagination
+        const startIndex = (pagination.page - 1) * pagination.limit;
+        const endIndex = startIndex + pagination.limit;
+        const paginatedData = filteredData.slice(startIndex, endIndex);
+
+        setWagesList(paginatedData);
+        setPagination((prev) => ({
+          ...prev,
+          total: filteredData.length,
+          totalPages: Math.ceil(filteredData.length / pagination.limit),
         }));
 
-        console.log("Transformed data:", transformedData);
-        setWagesList(transformedData);
-
-        // Update pagination
-        if (response.pagination) {
-          setPagination((prev) => ({
-            ...prev,
-            total: response.pagination.totalItems,
-            totalPages: response.pagination.totalPages,
-          }));
-        }
-
-        // Update statistics
-        if (response.statistics?.summary) {
-          const summary = response.statistics.summary;
-          setStats({
-            totalWages:
-              summary.totalCalculatedAmount || summary.totalAmount || 0,
-            totalPaid: summary.paidAmount || summary.fullPaidAmount || 0,
-            totalRemaining:
-              summary.unpaidAmount || summary.totalRemainingAmount || 0,
-            totalTeachers: summary.totalRecords || 0,
-            paidTeachers: summary.paidRecords || summary.fullPaidRecords || 0,
-            unpaidTeachers: summary.unpaidRecords || 0,
-          });
-        }
-      }
+        setLoading(false);
+      }, 500);
     } catch (error) {
       console.error("Error fetching wage data:", error);
-      setError(
-        "Không thể tải dữ liệu lương giáo viên. Đang hiển thị dữ liệu mẫu."
-      );
-
-      // Fallback to mock data when API fails
-      console.log("Falling back to mock data...");
-      setWagesList(mockTeacherWages);
-      setStats({
-        totalWages: mockTeacherWages.reduce(
-          (sum, wage) => sum + wage.totalWage,
-          0
-        ),
-        totalPaid: mockTeacherWages.reduce(
-          (sum, wage) => sum + wage.paidAmount,
-          0
-        ),
-        totalRemaining: mockTeacherWages.reduce(
-          (sum, wage) => sum + wage.remainingAmount,
-          0
-        ),
-        totalTeachers: mockTeacherWages.length,
-        paidTeachers: mockTeacherWages.filter(
-          (wage) => wage.paymentStatus === "paid"
-        ).length,
-        unpaidTeachers: mockTeacherWages.filter(
-          (wage) => wage.paymentStatus === "unpaid"
-        ).length,
-      });
-    } finally {
+      setError("Lỗi kết nối. Vui lòng thử lại.");
       setLoading(false);
     }
   }, [user, filters, pagination.page, pagination.limit]);
@@ -346,137 +334,78 @@ const SalaryManagement = ({ user }) => {
   };
 
   // Handle calculate wages
-  const handleCalculateWages = async (month, year) => {
-    if (!month || !year) {
+  const handleCalculateWages = async () => {
+    if (!filters.month || !filters.year) {
       alert("Vui lòng chọn tháng và năm để tính lương");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await apiService.calculateTeacherWages(
-        user.token,
-        month,
-        year
-      );
+      // TODO: Replace with actual API call
+      // await apiService.calculateTeacherWages(user.token, {
+      //   month: filters.month,
+      //   year: filters.year
+      // });
 
-      if (response.data) {
-        alert(
-          `Tính lương thành công! Đã xử lý ${response.data.totalProcessed} bản ghi.`
-        );
-      } else {
+      // Mock implementation
+      setTimeout(() => {
         alert("Tính lương thành công!");
-      }
-
-      setShowCalculateModal(false);
-      fetchWageData();
+        setShowCalculateModal(false);
+        fetchWageData();
+      }, 1000);
     } catch (error) {
       console.error("Error calculating wages:", error);
       alert("Lỗi khi tính lương. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   // Handle payment
   const handlePayment = async (paymentAmount) => {
-    if (!paymentData || !user?.token) return;
+    if (!paymentData) return;
 
     setLoading(true);
     try {
-      await apiService.processTeacherWagePayment(
-        user.token,
-        paymentData.id,
-        paymentAmount
-      );
+      // TODO: Replace with actual API call
+      // await apiService.payTeacherWage(user.token, paymentData.id, {
+      //   amount: paymentAmount
+      // });
 
-      // Show success message
-      alert("Thanh toán thành công!");
+      // Mock implementation
+      setTimeout(() => {
+        setWagesList((prev) =>
+          prev.map((item) => {
+            if (item.id === paymentData.id) {
+              const newPaidAmount = item.paidAmount + paymentAmount;
+              const newRemainingAmount = item.totalWage - newPaidAmount;
+              const newPaymentStatus =
+                newRemainingAmount <= 0 ? "paid" : "partial";
 
-      // Close modal and refresh data
-      setShowPaymentModal(false);
-      setPaymentData(null);
-      fetchWageData();
+              return {
+                ...item,
+                paidAmount: newPaidAmount,
+                remainingAmount: newRemainingAmount,
+                paymentStatus: newPaymentStatus,
+                paymentDate:
+                  newPaymentStatus === "paid"
+                    ? new Date().toISOString().split("T")[0]
+                    : item.paymentDate,
+              };
+            }
+            return item;
+          })
+        );
+
+        setShowPaymentModal(false);
+        setPaymentData(null);
+        fetchWageData();
+      }, 500);
     } catch (error) {
       console.error("Error processing payment:", error);
       alert("Lỗi khi thanh toán. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
     }
-  };
-
-  // Handle row click to show details
-  const handleRowClick = (wageData) => {
-    setDetailData(wageData);
-    setShowDetailModal(true);
-  };
-
-  // Handle delete wage
-  const handleDeleteWage = async (wageId) => {
-    if (!user?.token) return;
-
-    if (!confirm("Bạn có chắc chắn muốn xóa bản ghi lương này không?")) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await apiService.deleteTeacherWage(user.token, wageId);
-
-      // Show success message
-      alert("Xóa bản ghi lương thành công!");
-
-      // Refresh data
-      fetchWageData();
-    } catch (error) {
-      console.error("Error deleting wage:", error);
-      alert("Lỗi khi xóa bản ghi lương. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle edit wage
-  const handleEditWage = async (wageData) => {
-    if (!user?.token) return;
-
-    setLoading(true);
-    try {
-      await apiService.updateTeacherWage(user.token, wageData.id, wageData);
-
-      // Show success message
-      alert("Cập nhật lương thành công!");
-
-      // Close modal and refresh data
-      setShowEditModal(false);
-      setEditData(null);
-      fetchWageData();
-    } catch (error) {
-      console.error("Error updating wage:", error);
-      alert("Lỗi khi cập nhật lương. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle save edit
-  const handleSaveEdit = async (updatedData) => {
-    if (!editData || !user?.token) return;
-
-    setLoading(true);
-    try {
-      await apiService.updateTeacherWage(user.token, editData.id, updatedData);
-
-      alert("Cập nhật thông tin lương thành công!");
-      setShowEditModal(false);
-      setEditData(null);
-      fetchWageData();
-    } catch (error) {
-      console.error("Error updating wage:", error);
-      alert("Lỗi khi cập nhật thông tin lương. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   // Format currency
@@ -515,10 +444,9 @@ const SalaryManagement = ({ user }) => {
   };
 
   return (
-    <section>
+    <section style={{ padding: "0", margin: "0" }}>
       {/* Header */}
       <div
-        className="section-header"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -741,10 +669,7 @@ const SalaryManagement = ({ user }) => {
           <select
             value={filters.month}
             onChange={(e) =>
-              handleFilterChange(
-                "month",
-                e.target.value ? parseInt(e.target.value) : ""
-              )
+              handleFilterChange("month", parseInt(e.target.value))
             }
             style={{
               width: "100%",
@@ -755,7 +680,6 @@ const SalaryManagement = ({ user }) => {
               backgroundColor: "white",
             }}
           >
-            <option value="">Tất cả tháng</option>
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
                 Tháng {i + 1}
@@ -776,17 +700,10 @@ const SalaryManagement = ({ user }) => {
           >
             Năm:
           </label>
-          <input
-            type="number"
-            min="2000"
-            max="2099"
-            placeholder="Chọn năm"
+          <select
             value={filters.year}
             onChange={(e) =>
-              handleFilterChange(
-                "year",
-                e.target.value ? parseInt(e.target.value) : ""
-              )
+              handleFilterChange("year", parseInt(e.target.value))
             }
             style={{
               width: "100%",
@@ -796,7 +713,16 @@ const SalaryManagement = ({ user }) => {
               fontSize: "0.875rem",
               backgroundColor: "white",
             }}
-          />
+          >
+            {Array.from({ length: 5 }, (_, i) => {
+              const year = new Date().getFullYear() - 2 + i;
+              return (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              );
+            })}
+          </select>
         </div>
 
         <div style={{ flex: "1", minWidth: "200px" }}>
@@ -1139,14 +1065,14 @@ const SalaryManagement = ({ user }) => {
                       >
                         <button
                           onClick={() => {
-                            setEditData(wage);
-                            setShowEditModal(true);
+                            setDetailData(wage);
+                            setShowDetailModal(true);
                           }}
                           style={{
                             padding: "0.5rem",
-                            backgroundColor: "#3b82f6",
-                            color: "white",
-                            border: "1px solid #3b82f6",
+                            backgroundColor: "#f3f4f6",
+                            color: "#374151",
+                            border: "1px solid #d1d5db",
                             borderRadius: "0.375rem",
                             cursor: "pointer",
                             transition: "all 0.2s ease",
@@ -1154,82 +1080,31 @@ const SalaryManagement = ({ user }) => {
                             alignItems: "center",
                             justifyContent: "center",
                           }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = "#2563eb";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = "#3b82f6";
-                          }}
                         >
-                          <FiEdit style={{ fontSize: "0.875rem" }} />
+                          <FiEye style={{ fontSize: "0.875rem" }} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteWage(wage.id)}
-                          style={{
-                            padding: "0.5rem",
-                            backgroundColor: "#ef4444",
-                            color: "white",
-                            border: "1px solid #ef4444",
-                            borderRadius: "0.375rem",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = "#dc2626";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = "#ef4444";
-                          }}
-                        >
-                          <FiTrash2 style={{ fontSize: "0.875rem" }} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setPaymentData(wage);
-                            setShowPaymentModal(true);
-                          }}
-                          disabled={wage.paymentStatus === "paid"}
-                          style={{
-                            padding: "0.5rem",
-                            backgroundColor:
-                              wage.paymentStatus === "paid"
-                                ? "#d1d5db"
-                                : "#10b981",
-                            color:
-                              wage.paymentStatus === "paid"
-                                ? "#6b7280"
-                                : "white",
-                            border: `1px solid ${
-                              wage.paymentStatus === "paid"
-                                ? "#d1d5db"
-                                : "#10b981"
-                            }`,
-                            borderRadius: "0.375rem",
-                            cursor:
-                              wage.paymentStatus === "paid"
-                                ? "not-allowed"
-                                : "pointer",
-                            transition: "all 0.2s ease",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (wage.paymentStatus !== "paid") {
-                              e.target.style.backgroundColor = "#059669";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (wage.paymentStatus !== "paid") {
-                              e.target.style.backgroundColor = "#10b981";
-                            }
-                          }}
-                        >
-                          <FiDollarSign style={{ fontSize: "0.875rem" }} />
-                        </button>
+                        {wage.paymentStatus !== "paid" && (
+                          <button
+                            onClick={() => {
+                              setPaymentData(wage);
+                              setShowPaymentModal(true);
+                            }}
+                            style={{
+                              padding: "0.5rem",
+                              backgroundColor: "#3b82f6",
+                              color: "white",
+                              border: "1px solid #3b82f6",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <FiDollarSign style={{ fontSize: "0.875rem" }} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1358,19 +1233,6 @@ const SalaryManagement = ({ user }) => {
           onCalculate={handleCalculateWages}
           filters={filters}
           setFilters={setFilters}
-        />
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && editData && (
-        <EditModal
-          editData={editData}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditData(null);
-          }}
-          onSave={handleSaveEdit}
-          formatCurrency={formatCurrency}
         />
       )}
     </section>
@@ -1696,18 +1558,13 @@ const DetailModal = ({
 // Payment Modal Component
 const PaymentModal = ({ paymentData, onClose, onPayment, formatCurrency }) => {
   const [paymentAmount, setPaymentAmount] = useState(
-    paymentData.remainingAmount || 0
+    paymentData.remainingAmount
   );
   const [paymentNote, setPaymentNote] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const maxAmount = paymentData.remainingAmount || 0;
-    if (
-      isNaN(paymentAmount) ||
-      paymentAmount <= 0 ||
-      paymentAmount > maxAmount
-    ) {
+    if (paymentAmount <= 0 || paymentAmount > paymentData.remainingAmount) {
       alert("Số tiền thanh toán không hợp lệ");
       return;
     }
@@ -1833,16 +1690,8 @@ const PaymentModal = ({ paymentData, onClose, onPayment, formatCurrency }) => {
             <input
               type="number"
               value={paymentAmount}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "") {
-                  setPaymentAmount(0);
-                } else {
-                  const numValue = parseInt(value);
-                  setPaymentAmount(isNaN(numValue) ? 0 : numValue);
-                }
-              }}
-              max={paymentData.remainingAmount || 0}
+              onChange={(e) => setPaymentAmount(parseInt(e.target.value))}
+              max={paymentData.remainingAmount}
               min={1}
               required
               style={{
@@ -1930,13 +1779,8 @@ const PaymentModal = ({ paymentData, onClose, onPayment, formatCurrency }) => {
 
 // Calculate Modal Component
 const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
-  const currentDate = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(
-    filters.month || currentDate.getMonth() + 1
-  );
-  const [selectedYear, setSelectedYear] = useState(
-    filters.year || currentDate.getFullYear()
-  );
+  const [selectedMonth, setSelectedMonth] = useState(filters.month);
+  const [selectedYear, setSelectedYear] = useState(filters.year);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1945,7 +1789,7 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
       month: selectedMonth,
       year: selectedYear,
     }));
-    onCalculate(selectedMonth, selectedYear);
+    onCalculate();
   };
 
   return (
@@ -2035,22 +1879,9 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
             >
               Năm:
             </label>
-            <input
-              type="number"
-              min="2000"
-              max="2099"
+            <select
               value={selectedYear}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "") {
-                  setSelectedYear(new Date().getFullYear());
-                } else {
-                  const numValue = parseInt(value);
-                  setSelectedYear(
-                    isNaN(numValue) ? new Date().getFullYear() : numValue
-                  );
-                }
-              }}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
               required
               style={{
                 width: "100%",
@@ -2060,7 +1891,16 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
                 fontSize: "0.875rem",
                 backgroundColor: "white",
               }}
-            />
+            >
+              {Array.from({ length: 5 }, (_, i) => {
+                const year = new Date().getFullYear() - 2 + i;
+                return (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           <div
@@ -2100,270 +1940,6 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
               }}
             >
               Tính lương
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Edit Modal Component
-const EditModal = ({ editData, onClose, onSave, formatCurrency }) => {
-  const [formData, setFormData] = useState({
-    lessonTaught: editData.sessionsCount || 0,
-    amount: editData.paidAmount || 0,
-    paymentDate: editData.paymentDate || "",
-    paidBy: "",
-  });
-
-  // Store original data for comparison
-  const originalData = {
-    lessonTaught: editData.sessionsCount || 0,
-    amount: editData.paidAmount || 0,
-    paymentDate: editData.paymentDate || "",
-    paidBy: "",
-  };
-
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Only send changed fields
-    const changedFields = {};
-    Object.keys(formData).forEach((key) => {
-      if (formData[key] !== originalData[key]) {
-        changedFields[key] = formData[key];
-      }
-    });
-
-    // If no changes, show message and close
-    if (Object.keys(changedFields).length === 0) {
-      alert("Không có thay đổi nào để lưu");
-      onClose();
-      return;
-    }
-
-    console.log("Changed fields only:", changedFields);
-    onSave(changedFields);
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 9999,
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "white",
-          borderRadius: "0.75rem",
-          padding: "2rem",
-          maxWidth: "600px",
-          width: "90%",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-        }}
-      >
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h3
-            style={{
-              display: "flex",
-              alignItems: "center",
-              margin: 0,
-              fontSize: "1.25rem",
-              fontWeight: "600",
-              color: "#111827",
-            }}
-          >
-            <FiEdit style={{ marginRight: "0.5rem", color: "#3b82f6" }} />
-            Chỉnh sửa lương giáo viên
-          </h3>
-          <p
-            style={{
-              margin: "0.5rem 0 0 0",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-            }}
-          >
-            {editData.teacherName} - {editData.month}/{editData.year}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Số buổi dạy:
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.lessonTaught}
-                onChange={(e) =>
-                  handleChange("lessonTaught", parseInt(e.target.value) || 0)
-                }
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Số tiền đã trả:
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.amount}
-                onChange={(e) =>
-                  handleChange("amount", parseInt(e.target.value) || 0)
-                }
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Ngày thanh toán:
-              </label>
-              <input
-                type="date"
-                value={formData.paymentDate}
-                onChange={(e) => handleChange("paymentDate", e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Người thanh toán:
-              </label>
-              <input
-                type="text"
-                value={formData.paidBy}
-                onChange={(e) => handleChange("paidBy", e.target.value)}
-                placeholder="Nhập tên người thanh toán"
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "0.75rem",
-              justifyContent: "flex-end",
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: "0.75rem 1.5rem",
-                backgroundColor: "#f3f4f6",
-                color: "#374151",
-                border: "1px solid #d1d5db",
-                borderRadius: "0.5rem",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-              }}
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              style={{
-                padding: "0.75rem 1.5rem",
-                backgroundColor: "#3b82f6",
-                color: "white",
-                border: "1px solid #3b82f6",
-                borderRadius: "0.5rem",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-              }}
-            >
-              Lưu thay đổi
             </button>
           </div>
         </form>

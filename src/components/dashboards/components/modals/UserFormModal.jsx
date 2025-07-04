@@ -421,7 +421,7 @@ const UserFormModal = ({
             <div className="form-actions">
               <button
                 type="button"
-                className="user-edit-btn user-edit-btn-cancel"
+                className="btn-cancel"
                 onClick={() => {
                   resetFormData();
                   setShowAddUserForm(false);
@@ -432,11 +432,7 @@ const UserFormModal = ({
                 <FiX />
                 {editingUser ? "Hủy chỉnh sửa" : "Hủy"}
               </button>
-              <button
-                type="submit"
-                className="user-edit-btn user-edit-btn-save"
-                disabled={loading}
-              >
+              <button type="submit" className="btn-save" disabled={loading}>
                 <FiSave />
                 {loading
                   ? "Đang xử lý..."

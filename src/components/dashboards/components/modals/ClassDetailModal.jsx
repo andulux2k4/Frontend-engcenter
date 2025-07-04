@@ -8,7 +8,7 @@ import {
   FiMail,
   FiPhone,
   FiBarChart2,
-  FiCheckCircle,
+  FiCheck,
   FiHome,
   FiInfo,
   FiEye,
@@ -729,7 +729,7 @@ function ClassDetailModal({
                           marginBottom: "0.75rem",
                         }}
                       >
-                        <FiCheckCircle
+                        <FiCheck
                           style={{
                             fontSize: "2rem",
                             color: "#16a34a",

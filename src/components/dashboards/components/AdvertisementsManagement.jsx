@@ -368,24 +368,100 @@ const AdvertisementsManagement = ({ user }) => {
   };
 
   return (
-    <section className="advertisements-section">
-      <div className="section-header">
-        <h2 className="section-title">
-          <MdCampaign className="icon" />
+    <section>
+      <div
+        className="section-header"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1.5rem",
+          padding: "1.5rem",
+          backgroundColor: "white",
+          borderRadius: "0.75rem",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          border: "1px solid #e5e7eb",
+        }}
+      >
+        <h2
+          className="section-title"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            margin: 0,
+            fontSize: "1.5rem",
+            fontWeight: "600",
+            color: "#111827",
+          }}
+        >
+          <MdCampaign style={{ marginRight: "0.75rem", color: "#3b82f6" }} />
           Quản lý Quảng cáo
         </h2>
-        <button className="btn btn-primary" onClick={handleAddAdvertisement}>
-          <FiPlus className="icon" /> Thêm quảng cáo
+        <button
+          className="btn btn-primary"
+          onClick={handleAddAdvertisement}
+          style={{
+            padding: "0.75rem 1.5rem",
+            backgroundColor: "#3b82f6",
+            color: "white",
+            border: "none",
+            borderRadius: "0.5rem",
+            fontSize: "0.875rem",
+            fontWeight: "500",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow:
+              "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          }}
+        >
+          <FiPlus style={{ fontSize: "1rem" }} />
+          Thêm quảng cáo
         </button>
       </div>
 
       {/* Filter and search */}
-      <div className="filter-bar">
-        <div className="filter-group">
-          <label>Trạng thái:</label>
+      <div
+        className="filter-bar"
+        style={{
+          display: "flex",
+          gap: "1rem",
+          marginBottom: "1.5rem",
+          padding: "1rem",
+          backgroundColor: "white",
+          borderRadius: "0.75rem",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          border: "1px solid #e5e7eb",
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="filter-group" style={{ flex: "1", minWidth: "200px" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "500",
+              color: "#374151",
+            }}
+          >
+            Trạng thái:
+          </label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "0.75rem",
+              border: "1px solid #d1d5db",
+              borderRadius: "0.375rem",
+              fontSize: "0.875rem",
+              backgroundColor: "white",
+            }}
           >
             <option value="all">Tất cả</option>
             <option value="Hoạt động">Hoạt động</option>
@@ -393,91 +469,353 @@ const AdvertisementsManagement = ({ user }) => {
           </select>
         </div>
 
-        <div className="search-group">
+        <div className="search-group" style={{ flex: "1", minWidth: "200px" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "500",
+              color: "#374151",
+            }}
+          >
+            Tìm kiếm:
+          </label>
           <input
             type="text"
             placeholder="Tìm kiếm quảng cáo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "0.75rem",
+              border: "1px solid #d1d5db",
+              borderRadius: "0.375rem",
+              fontSize: "0.875rem",
+            }}
           />
         </div>
       </div>
 
       {/* Error message */}
-      {error && <div className="error-message">{error}</div>}
-
-      {/* Loading state */}
-      {loading && (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
+      {error && (
+        <div
+          className="error-message"
+          style={{
+            padding: "1rem",
+            backgroundColor: "#fef2f2",
+            color: "#dc2626",
+            borderRadius: "0.375rem",
+            marginBottom: "1rem",
+            border: "1px solid #fecaca",
+          }}
+        >
+          {error}
         </div>
       )}
 
-      {/* Advertisements table */}
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Tiêu đề</th>
-              <th>Ngày bắt đầu</th>
-              <th>Ngày kết thúc</th>
-              <th>Đối tượng</th>
-              <th>Vị trí</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAdvertisements.length === 0 ? (
-              <tr>
-                <td colSpan="7" className="empty-table">
-                  {loading ? "Đang tải..." : "Không có dữ liệu"}
-                </td>
-              </tr>
-            ) : (
-              paginatedAdvertisements.map((ad) => (
-                <tr key={ad.id} onClick={(e) => handleAdRowClick(ad, e)}>
-                  <td className="ad-title">{ad.title}</td>
-                  <td>{formatDate(ad.startDate)}</td>
-                  <td>{formatDate(ad.endDate)}</td>
-                  <td>{getTargetDisplay(ad.target)}</td>
-                  <td>{getPositionDisplay(ad.position)}</td>
-                  <td>
+      {/* Loading state */}
+      {loading && (
+        <div
+          className="loading-container"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "2rem",
+          }}
+        >
+          <div
+            className="loading-spinner"
+            style={{
+              width: "2rem",
+              height: "2rem",
+              border: "3px solid #e5e7eb",
+              borderTop: "3px solid #3b82f6",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          ></div>
+        </div>
+      )}
+
+      {/* Advertisements Cards */}
+      <div
+        style={{
+          backgroundColor: "white",
+          borderRadius: "0.75rem",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          padding: "1.5rem",
+          border: "1px solid #e5e7eb",
+          marginBottom: "1.5rem",
+          overflow: "hidden",
+        }}
+      >
+        {loading ? (
+          <div
+            style={{
+              padding: "1.5rem",
+              textAlign: "center",
+              color: "#6b7280",
+              backgroundColor: "white",
+            }}
+          >
+            Đang tải dữ liệu...
+          </div>
+        ) : filteredAdvertisements.length === 0 ? (
+          <div
+            style={{
+              padding: "1.5rem",
+              textAlign: "center",
+              color: "#6b7280",
+              backgroundColor: "white",
+            }}
+          >
+            Không có quảng cáo nào
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
+              gap: "1.5rem",
+            }}
+          >
+            {paginatedAdvertisements.map((ad) => (
+              <div
+                key={ad.id}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "0.75rem",
+                  padding: "1.5rem",
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px 0 rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                {/* Status indicator strip */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: "4px",
+                    backgroundColor:
+                      ad.status === "Hoạt động" ? "#22c55e" : "#ef4444",
+                  }}
+                ></div>
+
+                {/* Header */}
+                <div style={{ marginBottom: "1rem" }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      marginBottom: "0.5rem",
+                      fontSize: "1.1rem",
+                      fontWeight: "600",
+                      color: "#111827",
+                      lineHeight: "1.3",
+                    }}
+                  >
+                    {ad.title}
+                  </h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      alignItems: "center",
+                      marginBottom: "0.75rem",
+                    }}
+                  >
                     <span
-                      className={`status-badge ${
-                        ad.status === "Hoạt động" ? "success" : ""
-                      }`}
+                      style={{
+                        padding: "0.25rem 0.75rem",
+                        borderRadius: "9999px",
+                        fontSize: "0.75rem",
+                        fontWeight: "500",
+                        backgroundColor: "#e0e7ff",
+                        color: "#3730a3",
+                      }}
+                    >
+                      {getTargetDisplay(ad.target)}
+                    </span>
+                    <span
+                      style={{
+                        padding: "0.25rem 0.75rem",
+                        borderRadius: "9999px",
+                        fontSize: "0.75rem",
+                        fontWeight: "500",
+                        backgroundColor: "#f0f9ff",
+                        color: "#1e40af",
+                      }}
+                    >
+                      {getPositionDisplay(ad.position)}
+                    </span>
+                    <span
+                      style={{
+                        padding: "0.25rem 0.75rem",
+                        borderRadius: "9999px",
+                        fontSize: "0.75rem",
+                        fontWeight: "500",
+                        backgroundColor:
+                          ad.status === "Hoạt động" ? "#f0fdf4" : "#fef2f2",
+                        color:
+                          ad.status === "Hoạt động" ? "#166534" : "#dc2626",
+                      }}
                     >
                       {ad.status}
                     </span>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => handleEditAdvertisement(ad)}
-                      >
-                        <FiEdit className="icon" /> Sửa
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => handleToggleAdvertisementStatus(ad.id)}
-                      >
-                        {ad.status === "Hoạt động" ? "Ngừng" : "Kích hoạt"}
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => handleDeleteAdvertisement(ad.id)}
-                      >
-                        <FiTrash2 className="icon" /> Xóa
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+
+                {/* Image preview */}
+                {ad.imageUrl && (
+                  <div
+                    style={{
+                      marginBottom: "1rem",
+                      borderRadius: "0.5rem",
+                      overflow: "hidden",
+                      border: "1px solid #e5e7eb",
+                    }}
+                  >
+                    <img
+                      src={ad.imageUrl}
+                      alt={ad.title}
+                      style={{
+                        width: "100%",
+                        height: "120px",
+                        objectFit: "cover",
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Content */}
+                <div
+                  style={{
+                    marginBottom: "1rem",
+                    color: "#6b7280",
+                    fontSize: "0.875rem",
+                    lineHeight: "1.5",
+                    maxHeight: "3rem",
+                    overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  {ad.description}
+                </div>
+
+                {/* Footer */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingTop: "1rem",
+                    borderTop: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.75rem",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#6b7280",
+                      }}
+                    >
+                      {formatDate(ad.startDate)} - {formatDate(ad.endDate)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => handleEditAdvertisement(ad)}
+                      style={{
+                        padding: "0.5rem",
+                        backgroundColor: "#f3f4f6",
+                        color: "#374151",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <FiEdit style={{ fontSize: "0.875rem" }} />
+                    </button>
+                    <button
+                      onClick={() => handleToggleAdvertisementStatus(ad.id)}
+                      style={{
+                        padding: "0.5rem",
+                        backgroundColor:
+                          ad.status === "Hoạt động" ? "#fef3c7" : "#dcfce7",
+                        color:
+                          ad.status === "Hoạt động" ? "#92400e" : "#166534",
+                        border:
+                          ad.status === "Hoạt động"
+                            ? "1px solid #fbbf24"
+                            : "1px solid #10b981",
+                        borderRadius: "0.375rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        fontSize: "0.75rem",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {ad.status === "Hoạt động" ? "Ngừng" : "Kích hoạt"}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAdvertisement(ad.id)}
+                      style={{
+                        padding: "0.5rem",
+                        backgroundColor: "#fef2f2",
+                        color: "#dc2626",
+                        border: "1px solid #fecaca",
+                        borderRadius: "0.375rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <FiTrash2 style={{ fontSize: "0.875rem" }} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Pagination */}

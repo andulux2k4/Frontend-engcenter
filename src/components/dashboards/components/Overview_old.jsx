@@ -3,7 +3,7 @@ import {
   FiUsers,
   FiFileText,
   FiBarChart2,
-  FiCheckCircle,
+  FiCheck,
   FiCalendar,
   FiRefreshCw,
 } from "react-icons/fi";
@@ -806,7 +806,7 @@ const Overview = ({ user }) => {
 
           {/* Student Growth Card */}
           <StatCard
-            icon={<FiCheckCircle size={20} />}
+            icon={<FiCheck size={20} />}
             title="Tăng trưởng học sinh"
             value={`+${stats.newStudentsThisMonth}`}
             subtitle={`📈 Mới: ${stats.newStudentsThisMonth} • 📉 Dừng: ${stats.inactiveStudentsThisMonth} • 🎯 Ròng: ${stats.newStudentsThisMonth - stats.inactiveStudentsThisMonth}`}

@@ -858,25 +858,27 @@ function AdminDashboard({ user, onLogout }) {
         `🔍 Edit user - Role: ${userSummary.role}, UserID: ${userId}, RoleID: ${roleId}`
       );
 
-      // Xác định nên sử dụng API endpoint nào
-      let useRoleSpecificEndpoint = false;
-
-      if (roleId) {
-        // Chỉ sử dụng role-specific endpoint khi có roleId
-        useRoleSpecificEndpoint = true;
-      } else {
-        console.warn(
-          "⚠️ Missing roleId for user, will use general user endpoint"
+      // Always use role-specific endpoint since general /users endpoint doesn't exist
+      let response;
+      if (roleId && userSummary.role) {
+        // Use role-specific endpoint with roleId
+        response = await apiService.getUserById(
+          user.token,
+          roleId, // Use roleId for role-specific endpoints
+          userSummary.role,
+          roleId
         );
+      } else {
+        // If no roleId, we can't get detailed info - use summary data
+        console.warn(
+          "⚠️ Missing roleId for user, using summary data for editing"
+        );
+        response = {
+          success: false,
+          message: "Cannot retrieve user details. Using summary data.",
+          data: null,
+        };
       }
-
-      // Gọi API để lấy thông tin chi tiết của user
-      const response = await apiService.getUserById(
-        user.token,
-        userId,
-        useRoleSpecificEndpoint ? userSummary.role : null,
-        roleId // Truyền roleId nếu có
-      );
 
       if (response.success && response.data) {
         // Cập nhật form data với thông tin chi tiết từ API
@@ -1095,20 +1097,30 @@ function AdminDashboard({ user, onLogout }) {
     }
 
     try {
-      // Try to delete using the user's role first, then fallback to general endpoint
+      console.log(
+        `🗑️ Deleting user: ${userToDelete.fullName}, Role: ${userToDelete.role}, RoleID: ${userToDelete.roleId}`
+      );
+
+      // Use roleId (which is the ID in the role-specific table) for deletion
+      const deleteId = userToDelete.roleId || userId; // Fallback to userId if roleId is not available
+
+      // Delete using the user's role and correct ID
       const response = await apiService.deleteUser(
         user.token,
-        userId,
+        deleteId, // Use roleId instead of userId
         userToDelete.role
       );
+
       // Backend returns: {msg, data} instead of {success, data}
       if (response.msg && response.msg.includes("thành công")) {
+        console.log("✅ User deleted successfully");
         loadUsers(); // Refresh the user list
       } else {
+        console.error("❌ Delete failed:", response.msg);
         setError(response.msg || "Không thể xóa người dùng");
       }
     } catch (error) {
-      console.error("Error deleting user:", error);
+      console.error("❌ Error deleting user:", error);
       setError("Lỗi kết nối. Vui lòng thử lại.");
     } finally {
       setLoading(false);
@@ -2054,8 +2066,6 @@ function AdminDashboard({ user, onLogout }) {
             />
           )}
 
-          {activeTab === "payments" && <SalaryManagement user={user} />}
-
           {activeTab === "notifications" && (
             <NotificationsManagement user={user} />
           )}
@@ -2091,12 +2101,13 @@ function AdminDashboard({ user, onLogout }) {
 
       {/* User Detail Modal */}
       <UserDetailModal
-        showUserDetail={showUserDetail}
-        userDetailLoading={userDetailLoading}
-        selectedUserDetail={selectedUserDetail}
-        setShowUserDetail={setShowUserDetail}
-        setSelectedUserDetail={setSelectedUserDetail}
-        setError={setError}
+        isOpen={showUserDetail}
+        onClose={() => {
+          setShowUserDetail(false);
+          setSelectedUserDetail(null);
+          setError("");
+        }}
+        user={selectedUserDetail}
       />
 
       {/* Class Detail Modal */}

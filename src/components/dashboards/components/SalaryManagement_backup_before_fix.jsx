@@ -27,12 +27,12 @@ const mockTeacherWages = [
     sessionsCount: 20,
     wagePerSession: 200000,
     totalWage: 4000000,
-    paidAmount: 2000000,
-    remainingAmount: 2000000,
+    paidAmount: 4000000,
+    remainingAmount: 0,
     month: 3,
     year: 2024,
-    paymentStatus: "partial",
-    paymentDate: null,
+    paymentStatus: "paid",
+    paymentDate: "2024-03-15",
     createdAt: "2024-03-01",
     updatedAt: "2024-03-15",
   },
@@ -45,12 +45,12 @@ const mockTeacherWages = [
     sessionsCount: 18,
     wagePerSession: 180000,
     totalWage: 3240000,
-    paidAmount: 0,
-    remainingAmount: 3240000,
+    paidAmount: 3240000,
+    remainingAmount: 0,
     month: 3,
     year: 2024,
-    paymentStatus: "unpaid",
-    paymentDate: null,
+    paymentStatus: "paid",
+    paymentDate: "2024-03-14",
     createdAt: "2024-03-01",
     updatedAt: "2024-03-14",
   },
@@ -346,28 +346,21 @@ const SalaryManagement = ({ user }) => {
   };
 
   // Handle calculate wages
-  const handleCalculateWages = async (month, year) => {
-    if (!month || !year) {
+  const handleCalculateWages = async () => {
+    if (!filters.month || !filters.year) {
       alert("Vui lòng chọn tháng và năm để tính lương");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await apiService.calculateTeacherWages(
+      await apiService.calculateTeacherWages(
         user.token,
-        month,
-        year
+        filters.month,
+        filters.year
       );
 
-      if (response.data) {
-        alert(
-          `Tính lương thành công! Đã xử lý ${response.data.totalProcessed} bản ghi.`
-        );
-      } else {
-        alert("Tính lương thành công!");
-      }
-
+      alert("Tính lương thành công!");
       setShowCalculateModal(false);
       fetchWageData();
     } catch (error) {
@@ -411,52 +404,10 @@ const SalaryManagement = ({ user }) => {
     setShowDetailModal(true);
   };
 
-  // Handle delete wage
-  const handleDeleteWage = async (wageId) => {
-    if (!user?.token) return;
-
-    if (!confirm("Bạn có chắc chắn muốn xóa bản ghi lương này không?")) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await apiService.deleteTeacherWage(user.token, wageId);
-
-      // Show success message
-      alert("Xóa bản ghi lương thành công!");
-
-      // Refresh data
-      fetchWageData();
-    } catch (error) {
-      console.error("Error deleting wage:", error);
-      alert("Lỗi khi xóa bản ghi lương. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle edit wage
-  const handleEditWage = async (wageData) => {
-    if (!user?.token) return;
-
-    setLoading(true);
-    try {
-      await apiService.updateTeacherWage(user.token, wageData.id, wageData);
-
-      // Show success message
-      alert("Cập nhật lương thành công!");
-
-      // Close modal and refresh data
-      setShowEditModal(false);
-      setEditData(null);
-      fetchWageData();
-    } catch (error) {
-      console.error("Error updating wage:", error);
-      alert("Lỗi khi cập nhật lương. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
+  const handleEditWage = (wageData) => {
+    setEditData(wageData);
+    setShowEditModal(true);
   };
 
   // Handle save edit
@@ -476,6 +427,26 @@ const SalaryManagement = ({ user }) => {
       alert("Lỗi khi cập nhật thông tin lương. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle delete wage
+  const handleDeleteWage = async (wageData) => {
+    if (!user?.token) return;
+
+    if (window.confirm(`Bạn có chắc chắn muốn xóa thông tin lương của ${wageData.teacherName}?`)) {
+      setLoading(true);
+      try {
+        await apiService.deleteTeacherWage(user.token, wageData.id);
+
+        alert("Xóa thông tin lương thành công!");
+        fetchWageData();
+      } catch (error) {
+        console.error("Error deleting wage:", error);
+        alert("Lỗi khi xóa thông tin lương. Vui lòng thử lại.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -741,10 +712,7 @@ const SalaryManagement = ({ user }) => {
           <select
             value={filters.month}
             onChange={(e) =>
-              handleFilterChange(
-                "month",
-                e.target.value ? parseInt(e.target.value) : ""
-              )
+              handleFilterChange("month", parseInt(e.target.value))
             }
             style={{
               width: "100%",
@@ -755,7 +723,6 @@ const SalaryManagement = ({ user }) => {
               backgroundColor: "white",
             }}
           >
-            <option value="">Tất cả tháng</option>
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
                 Tháng {i + 1}
@@ -776,17 +743,10 @@ const SalaryManagement = ({ user }) => {
           >
             Năm:
           </label>
-          <input
-            type="number"
-            min="2000"
-            max="2099"
-            placeholder="Chọn năm"
+          <select
             value={filters.year}
             onChange={(e) =>
-              handleFilterChange(
-                "year",
-                e.target.value ? parseInt(e.target.value) : ""
-              )
+              handleFilterChange("year", parseInt(e.target.value))
             }
             style={{
               width: "100%",
@@ -796,7 +756,16 @@ const SalaryManagement = ({ user }) => {
               fontSize: "0.875rem",
               backgroundColor: "white",
             }}
-          />
+          >
+            {Array.from({ length: 5 }, (_, i) => {
+              const year = new Date().getFullYear() - 2 + i;
+              return (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              );
+            })}
+          </select>
         </div>
 
         <div style={{ flex: "1", minWidth: "200px" }}>
@@ -1016,7 +985,7 @@ const SalaryManagement = ({ user }) => {
                     padding: "1rem",
                     textAlign: "right",
                     fontWeight: "600",
-                    color: "#374151",
+color: "#374151",
                     cursor: "pointer",
                   }}
                   onClick={() => handleFilterChange("sortBy", "totalWage")}
@@ -1139,14 +1108,14 @@ const SalaryManagement = ({ user }) => {
                       >
                         <button
                           onClick={() => {
-                            setEditData(wage);
-                            setShowEditModal(true);
+                            setDetailData(wage);
+                            setShowDetailModal(true);
                           }}
                           style={{
                             padding: "0.5rem",
-                            backgroundColor: "#3b82f6",
-                            color: "white",
-                            border: "1px solid #3b82f6",
+                            backgroundColor: "#f3f4f6",
+                            color: "#374151",
+                            border: "1px solid #d1d5db",
                             borderRadius: "0.375rem",
                             cursor: "pointer",
                             transition: "all 0.2s ease",
@@ -1154,82 +1123,31 @@ const SalaryManagement = ({ user }) => {
                             alignItems: "center",
                             justifyContent: "center",
                           }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = "#2563eb";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = "#3b82f6";
-                          }}
                         >
-                          <FiEdit style={{ fontSize: "0.875rem" }} />
+                          <FiEye style={{ fontSize: "0.875rem" }} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteWage(wage.id)}
-                          style={{
-                            padding: "0.5rem",
-                            backgroundColor: "#ef4444",
-                            color: "white",
-                            border: "1px solid #ef4444",
-                            borderRadius: "0.375rem",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = "#dc2626";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = "#ef4444";
-                          }}
-                        >
-                          <FiTrash2 style={{ fontSize: "0.875rem" }} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setPaymentData(wage);
-                            setShowPaymentModal(true);
-                          }}
-                          disabled={wage.paymentStatus === "paid"}
-                          style={{
-                            padding: "0.5rem",
-                            backgroundColor:
-                              wage.paymentStatus === "paid"
-                                ? "#d1d5db"
-                                : "#10b981",
-                            color:
-                              wage.paymentStatus === "paid"
-                                ? "#6b7280"
-                                : "white",
-                            border: `1px solid ${
-                              wage.paymentStatus === "paid"
-                                ? "#d1d5db"
-                                : "#10b981"
-                            }`,
-                            borderRadius: "0.375rem",
-                            cursor:
-                              wage.paymentStatus === "paid"
-                                ? "not-allowed"
-                                : "pointer",
-                            transition: "all 0.2s ease",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (wage.paymentStatus !== "paid") {
-                              e.target.style.backgroundColor = "#059669";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (wage.paymentStatus !== "paid") {
-                              e.target.style.backgroundColor = "#10b981";
-                            }
-                          }}
-                        >
-                          <FiDollarSign style={{ fontSize: "0.875rem" }} />
-                        </button>
+                        {wage.paymentStatus !== "paid" && (
+                          <button
+                            onClick={() => {
+                              setPaymentData(wage);
+                              setShowPaymentModal(true);
+                            }}
+                            style={{
+                              padding: "0.5rem",
+                              backgroundColor: "#3b82f6",
+                              color: "white",
+                              border: "1px solid #3b82f6",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <FiDollarSign style={{ fontSize: "0.875rem" }} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1358,19 +1276,6 @@ const SalaryManagement = ({ user }) => {
           onCalculate={handleCalculateWages}
           filters={filters}
           setFilters={setFilters}
-        />
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && editData && (
-        <EditModal
-          editData={editData}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditData(null);
-          }}
-          onSave={handleSaveEdit}
-          formatCurrency={formatCurrency}
         />
       )}
     </section>
@@ -1696,18 +1601,13 @@ const DetailModal = ({
 // Payment Modal Component
 const PaymentModal = ({ paymentData, onClose, onPayment, formatCurrency }) => {
   const [paymentAmount, setPaymentAmount] = useState(
-    paymentData.remainingAmount || 0
+    paymentData.remainingAmount
   );
   const [paymentNote, setPaymentNote] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const maxAmount = paymentData.remainingAmount || 0;
-    if (
-      isNaN(paymentAmount) ||
-      paymentAmount <= 0 ||
-      paymentAmount > maxAmount
-    ) {
+    if (paymentAmount <= 0 || paymentAmount > paymentData.remainingAmount) {
       alert("Số tiền thanh toán không hợp lệ");
       return;
     }
@@ -1833,16 +1733,8 @@ const PaymentModal = ({ paymentData, onClose, onPayment, formatCurrency }) => {
             <input
               type="number"
               value={paymentAmount}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "") {
-                  setPaymentAmount(0);
-                } else {
-                  const numValue = parseInt(value);
-                  setPaymentAmount(isNaN(numValue) ? 0 : numValue);
-                }
-              }}
-              max={paymentData.remainingAmount || 0}
+              onChange={(e) => setPaymentAmount(parseInt(e.target.value))}
+              max={paymentData.remainingAmount}
               min={1}
               required
               style={{
@@ -1930,13 +1822,8 @@ const PaymentModal = ({ paymentData, onClose, onPayment, formatCurrency }) => {
 
 // Calculate Modal Component
 const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
-  const currentDate = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(
-    filters.month || currentDate.getMonth() + 1
-  );
-  const [selectedYear, setSelectedYear] = useState(
-    filters.year || currentDate.getFullYear()
-  );
+  const [selectedMonth, setSelectedMonth] = useState(filters.month);
+  const [selectedYear, setSelectedYear] = useState(filters.year);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1945,7 +1832,7 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
       month: selectedMonth,
       year: selectedYear,
     }));
-    onCalculate(selectedMonth, selectedYear);
+    onCalculate();
   };
 
   return (
@@ -2035,22 +1922,9 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
             >
               Năm:
             </label>
-            <input
-              type="number"
-              min="2000"
-              max="2099"
+            <select
               value={selectedYear}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "") {
-                  setSelectedYear(new Date().getFullYear());
-                } else {
-                  const numValue = parseInt(value);
-                  setSelectedYear(
-                    isNaN(numValue) ? new Date().getFullYear() : numValue
-                  );
-                }
-              }}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
               required
               style={{
                 width: "100%",
@@ -2060,7 +1934,16 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
                 fontSize: "0.875rem",
                 backgroundColor: "white",
               }}
-            />
+            >
+              {Array.from({ length: 5 }, (_, i) => {
+                const year = new Date().getFullYear() - 2 + i;
+                return (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           <div
@@ -2100,270 +1983,6 @@ const CalculateModal = ({ onClose, onCalculate, filters, setFilters }) => {
               }}
             >
               Tính lương
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Edit Modal Component
-const EditModal = ({ editData, onClose, onSave, formatCurrency }) => {
-  const [formData, setFormData] = useState({
-    lessonTaught: editData.sessionsCount || 0,
-    amount: editData.paidAmount || 0,
-    paymentDate: editData.paymentDate || "",
-    paidBy: "",
-  });
-
-  // Store original data for comparison
-  const originalData = {
-    lessonTaught: editData.sessionsCount || 0,
-    amount: editData.paidAmount || 0,
-    paymentDate: editData.paymentDate || "",
-    paidBy: "",
-  };
-
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Only send changed fields
-    const changedFields = {};
-    Object.keys(formData).forEach((key) => {
-      if (formData[key] !== originalData[key]) {
-        changedFields[key] = formData[key];
-      }
-    });
-
-    // If no changes, show message and close
-    if (Object.keys(changedFields).length === 0) {
-      alert("Không có thay đổi nào để lưu");
-      onClose();
-      return;
-    }
-
-    console.log("Changed fields only:", changedFields);
-    onSave(changedFields);
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 9999,
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "white",
-          borderRadius: "0.75rem",
-          padding: "2rem",
-          maxWidth: "600px",
-          width: "90%",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-        }}
-      >
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h3
-            style={{
-              display: "flex",
-              alignItems: "center",
-              margin: 0,
-              fontSize: "1.25rem",
-              fontWeight: "600",
-              color: "#111827",
-            }}
-          >
-            <FiEdit style={{ marginRight: "0.5rem", color: "#3b82f6" }} />
-            Chỉnh sửa lương giáo viên
-          </h3>
-          <p
-            style={{
-              margin: "0.5rem 0 0 0",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-            }}
-          >
-            {editData.teacherName} - {editData.month}/{editData.year}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-              marginBottom: "1.5rem",
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Số buổi dạy:
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.lessonTaught}
-                onChange={(e) =>
-                  handleChange("lessonTaught", parseInt(e.target.value) || 0)
-                }
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Số tiền đã trả:
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.amount}
-                onChange={(e) =>
-                  handleChange("amount", parseInt(e.target.value) || 0)
-                }
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Ngày thanh toán:
-              </label>
-              <input
-                type="date"
-                value={formData.paymentDate}
-                onChange={(e) => handleChange("paymentDate", e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                }}
-              >
-                Người thanh toán:
-              </label>
-              <input
-                type="text"
-                value={formData.paidBy}
-                onChange={(e) => handleChange("paidBy", e.target.value)}
-                placeholder="Nhập tên người thanh toán"
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "0.375rem",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "0.75rem",
-              justifyContent: "flex-end",
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: "0.75rem 1.5rem",
-                backgroundColor: "#f3f4f6",
-                color: "#374151",
-                border: "1px solid #d1d5db",
-                borderRadius: "0.5rem",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-              }}
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              style={{
-                padding: "0.75rem 1.5rem",
-                backgroundColor: "#3b82f6",
-                color: "white",
-                border: "1px solid #3b82f6",
-                borderRadius: "0.5rem",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-              }}
-            >
-              Lưu thay đổi
             </button>
           </div>
         </form>

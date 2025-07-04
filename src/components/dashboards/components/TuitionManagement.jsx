@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { MdPayment } from "react-icons/md";
-import { FiEye, FiEdit, FiTrash2, FiPlus } from "react-icons/fi";
+import { FiEye, FiEdit, FiTrash2, FiPlus, FiCheck, FiX } from "react-icons/fi";
 import TuitionDetailModal from "./modals/TuitionDetailModal";
 import TuitionFormModal from "./modals/TuitionFormModal";
 
@@ -91,19 +91,8 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
     return matchesStatus && matchesSearch;
   });
 
-  // Get current items for pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const paginatedTuitions = filteredTuitionList.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
-
-  // Change page
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  // Calculate total pages
-  const totalPages = Math.ceil(filteredTuitionList.length / itemsPerPage);
+  // Use all filtered tuitions without pagination
+  const displayedTuitions = filteredTuitionList;
 
   // Handle adding new tuition
   const handleAddTuition = () => {
@@ -165,24 +154,58 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
       <div
         className="section-header"
         style={{
+          display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          gap: "1rem",
+          marginBottom: "1.5rem",
+          padding: "1.5rem",
+          backgroundColor: "white",
+          borderRadius: "0.75rem",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          border: "1px solid #e5e7eb",
         }}
       >
-        <h2 className="section-title">
-          <MdPayment className="icon" />
+        <h2
+          className="section-title"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            margin: 0,
+            fontSize: "1.5rem",
+            fontWeight: "600",
+            color: "#111827",
+          }}
+        >
+          <MdPayment style={{ marginRight: "0.75rem", color: "#3b82f6" }} />
           Quản lý Học phí
         </h2>
-        <button
-          className="btn btn-primary"
-          style={{ background: "#b30000" }}
-          onClick={handleAddTuition}
-          disabled={loading}
-        >
-          <FiPlus style={{ marginRight: "0.5rem" }} />
-          Thêm khoản học phí
-        </button>
+        <div className="section-actions">
+          <button
+            className="btn btn-primary"
+            onClick={handleAddTuition}
+            disabled={loading}
+            style={{
+              padding: "0.75rem 1.5rem",
+              backgroundColor: "#3b82f6",
+              color: "white",
+              border: "none",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "500",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              boxShadow:
+                "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+            }}
+          >
+            <FiPlus style={{ fontSize: "1rem" }} />
+            Thêm khoản học phí
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -190,36 +213,48 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
           className="error-message"
           style={{
             padding: "1rem",
-            backgroundColor: "#fed7d7",
-            color: "#c53030",
+            backgroundColor: "#fef2f2",
+            color: "#dc2626",
+            border: "1px solid #fecaca",
             borderRadius: "0.5rem",
-            marginBottom: "1rem",
+            marginBottom: "1.5rem",
+            fontSize: "0.875rem",
           }}
         >
           {error}
         </div>
       )}
 
-      {/* Bộ lọc và tìm kiếm */}
+      {/* Filter and Search Section */}
       <div
+        className="filter-section"
         style={{
           display: "flex",
-          gap: "1.5rem",
+          flexWrap: "wrap",
           alignItems: "center",
+          gap: "1rem",
           marginBottom: "1.5rem",
-          background: "#fff",
-          padding: "1rem 1.5rem",
-          borderRadius: "0.75rem",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+          padding: "1rem",
+          backgroundColor: "white",
+          borderRadius: "0.5rem",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
           border: "1px solid #e5e7eb",
         }}
       >
-        <div>
+        {/* Status Filter */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
           <label
             style={{
               fontWeight: "500",
               color: "#374151",
-              marginRight: "0.5rem",
+              fontSize: "0.875rem",
             }}
           >
             Trạng thái:
@@ -229,10 +264,11 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
             onChange={(e) => setTuitionStatusFilter(e.target.value)}
             style={{
               padding: "0.5rem 0.75rem",
-              borderRadius: "0.375rem",
               border: "1px solid #d1d5db",
-              backgroundColor: "white",
+              borderRadius: "0.375rem",
               fontSize: "0.875rem",
+              backgroundColor: "white",
+              minWidth: "120px",
             }}
           >
             <option value="all">Tất cả</option>
@@ -241,47 +277,234 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
             <option value="Từ chối">Từ chối</option>
           </select>
         </div>
-        <div style={{ flex: 1 }}>
+
+        {/* Search Input */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            minWidth: "300px",
+            flex: 1,
+          }}
+        >
           <input
             type="text"
             placeholder="Tìm kiếm học viên hoặc lớp học..."
             value={tuitionSearch}
             onChange={(e) => setTuitionSearch(e.target.value)}
             style={{
-              width: "100%",
               padding: "0.5rem 0.75rem",
-              borderRadius: "0.375rem",
               border: "1px solid #d1d5db",
-              backgroundColor: "white",
+              borderRadius: "0.375rem",
               fontSize: "0.875rem",
+              flex: 1,
             }}
           />
         </div>
+
+        {/* Summary Stats */}
         <div
-          style={{ fontWeight: "600", color: "#166534", fontSize: "0.95rem" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            marginLeft: "auto",
+          }}
         >
-          Tổng thu: {totalPaid.toLocaleString()} VNĐ
-        </div>
-        <div
-          style={{ fontWeight: "600", color: "#b91c1c", fontSize: "0.95rem" }}
-        >
-          Chưa thu: {totalUnpaid.toLocaleString()} VNĐ
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              backgroundColor: "#f0fdf4",
+              borderRadius: "0.375rem",
+              border: "1px solid #bbf7d0",
+            }}
+          >
+            <span
+              style={{
+                fontWeight: "500",
+                color: "#166534",
+                fontSize: "0.875rem",
+              }}
+            >
+              Đã thu:
+            </span>
+            <span
+              style={{
+                fontWeight: "600",
+                color: "#166534",
+                fontSize: "0.875rem",
+              }}
+            >
+              {totalPaid.toLocaleString()} VNĐ
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              backgroundColor: "#fef2f2",
+              borderRadius: "0.375rem",
+              border: "1px solid #fecaca",
+            }}
+          >
+            <span
+              style={{
+                fontWeight: "500",
+                color: "#dc2626",
+                fontSize: "0.875rem",
+              }}
+            >
+              Chưa thu:
+            </span>
+            <span
+              style={{
+                fontWeight: "600",
+                color: "#dc2626",
+                fontSize: "0.875rem",
+              }}
+            >
+              {totalUnpaid.toLocaleString()} VNĐ
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Tuition table */}
-      <div className="table-container">
-        <table className="data-table">
+      {/* Data Table */}
+      <div
+        className="table-container"
+        style={{
+          backgroundColor: "white",
+          borderRadius: "0.75rem",
+          boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          border: "1px solid #e5e7eb",
+          overflow: "hidden",
+        }}
+      >
+        <table
+          className="data-table"
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+          }}
+        >
           <thead>
-            <tr>
-              <th>Học viên</th>
-              <th>Lớp</th>
-              <th>Số buổi</th>
-              <th>Tổng tiền</th>
-              <th>Đã đóng</th>
-              <th style={{ width: "10%" }}>Ngày</th>
-              <th style={{ width: "15%" }}>Trạng thái</th>
-              <th>Thao tác</th>
+            <tr
+              style={{
+                backgroundColor: "#f9fafb",
+                borderBottom: "1px solid #e5e7eb",
+              }}
+            >
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "left",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Học viên
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "left",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Lớp học
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Số buổi
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "right",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Tổng tiền
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "right",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Đã đóng
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Ngày
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Trạng thái
+              </th>
+              <th
+                style={{
+                  padding: "0.75rem",
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Thao tác
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -289,12 +512,15 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
               <tr>
                 <td
                   colSpan="8"
-                  style={{ textAlign: "center", padding: "2rem" }}
+                  style={{
+                    padding: "3rem",
+                    textAlign: "center",
+                    color: "#6b7280",
+                    fontSize: "0.875rem",
+                  }}
                 >
                   <div className="loading-spinner"></div>
-                  <div style={{ marginTop: "1rem", color: "#6b7280" }}>
-                    Đang tải dữ liệu...
-                  </div>
+                  <div style={{ marginTop: "1rem" }}>Đang tải dữ liệu...</div>
                 </td>
               </tr>
             ) : filteredTuitionList.length === 0 ? (
@@ -302,46 +528,106 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
                 <td
                   colSpan="8"
                   style={{
+                    padding: "3rem",
                     textAlign: "center",
-                    padding: "2rem",
-                    color: "#b30000",
+                    color: "#6b7280",
+                    fontSize: "0.875rem",
                   }}
                 >
-                  Không có dữ liệu học phí
+                  Không tìm thấy dữ liệu học phí
                 </td>
               </tr>
             ) : (
-              paginatedTuitions.map((tuition) => (
+              displayedTuitions.map((tuition) => (
                 <tr
                   key={tuition.id}
-                  style={{ cursor: "pointer" }}
+                  style={{
+                    borderBottom: "1px solid #f3f4f6",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s ease",
+                  }}
                   onClick={(e) => handleRowClick(tuition, e)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f9fafb";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
                 >
-                  <td style={{ fontWeight: "500" }}>{tuition.student}</td>
-                  <td>{tuition.class}</td>
-                  <td style={{ textAlign: "center" }}>{tuition.sessions}</td>
-                  <td style={{ color: "#b30000", fontWeight: "500" }}>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      fontSize: "0.875rem",
+                      color: "#111827",
+                      fontWeight: "500",
+                    }}
+                  >
+                    {tuition.student}
+                  </td>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      fontSize: "0.875rem",
+                      color: "#6b7280",
+                    }}
+                  >
+                    {tuition.class}
+                  </td>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      fontSize: "0.875rem",
+                      color: "#6b7280",
+                      textAlign: "center",
+                    }}
+                  >
+                    {tuition.sessions}
+                  </td>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      fontSize: "0.875rem",
+                      color: "#dc2626",
+                      fontWeight: "500",
+                      textAlign: "right",
+                    }}
+                  >
                     {tuition.amount?.toLocaleString()} VNĐ
                   </td>
-                  <td style={{ color: "#166534", fontWeight: "500" }}>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      fontSize: "0.875rem",
+                      color: "#059669",
+                      fontWeight: "500",
+                      textAlign: "right",
+                    }}
+                  >
                     {(tuition.paid || 0).toLocaleString()} VNĐ
                   </td>
-                  <td>{tuition.date}</td>
-                  <td>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      fontSize: "0.875rem",
+                      color: "#6b7280",
+                      textAlign: "center",
+                    }}
+                  >
+                    {tuition.date}
+                  </td>
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      textAlign: "center",
+                    }}
+                  >
                     <span
-                      className={`status-badge ${
-                        tuition.status === "Đã duyệt"
-                          ? "success"
-                          : tuition.status === "Từ chối"
-                          ? "danger"
-                          : "warning"
-                      }`}
                       style={{
                         display: "inline-block",
                         padding: "0.25rem 0.75rem",
                         borderRadius: "9999px",
-                        fontWeight: "500",
                         fontSize: "0.75rem",
+                        fontWeight: "500",
                         backgroundColor:
                           tuition.status === "Đã duyệt"
                             ? "#dcfce7"
@@ -352,52 +638,104 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
                           tuition.status === "Đã duyệt"
                             ? "#166534"
                             : tuition.status === "Từ chối"
-                            ? "#b91c1c"
+                            ? "#dc2626"
                             : "#92400e",
                       }}
                     >
                       {tuition.status}
                     </span>
                   </td>
-                  <td style={{ display: "flex", gap: "0.5rem" }}>
-                    {tuition.status === "Chờ duyệt" && (
-                      <>
-                        <button
-                          className="action-btn secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApproveTuition(tuition.id);
-                          }}
-                          disabled={loading}
-                        >
-                          <FiCheckCircle style={{ fontSize: "0.875rem" }} />
-                          Duyệt
-                        </button>
-                        <button
-                          className="action-btn danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRejectTuition(tuition.id);
-                          }}
-                          disabled={loading}
-                        >
-                          <FiTrash2 style={{ fontSize: "0.875rem" }} />
-                          Từ chối
-                        </button>
-                      </>
-                    )}
-                    <button
-                      className="action-btn secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTuition(tuition);
-                        setShowTuitionDetail(true);
+                  <td
+                    style={{
+                      padding: "1rem 0.75rem",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        justifyContent: "center",
                       }}
-                      disabled={loading}
                     >
-                      <FiEye style={{ fontSize: "0.875rem" }} />
-                      Xem
-                    </button>
+                      {tuition.status === "Chờ duyệt" && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApproveTuition(tuition.id);
+                            }}
+                            disabled={loading}
+                            style={{
+                              padding: "0.375rem 0.75rem",
+                              fontSize: "0.75rem",
+                              fontWeight: "500",
+                              backgroundColor: "#10b981",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            <FiCheck style={{ fontSize: "0.875rem" }} />
+                            Duyệt
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRejectTuition(tuition.id);
+                            }}
+                            disabled={loading}
+                            style={{
+                              padding: "0.375rem 0.75rem",
+                              fontSize: "0.75rem",
+                              fontWeight: "500",
+                              backgroundColor: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            <FiX style={{ fontSize: "0.875rem" }} />
+                            Từ chối
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTuition(tuition);
+                          setShowTuitionDetail(true);
+                        }}
+                        disabled={loading}
+                        style={{
+                          padding: "0.375rem 0.75rem",
+                          fontSize: "0.75rem",
+                          fontWeight: "500",
+                          backgroundColor: "#3b82f6",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "0.375rem",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        <FiEye style={{ fontSize: "0.875rem" }} />
+                        Xem
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -405,101 +743,6 @@ const TuitionManagement = ({ user, loading, error, setError }) => {
           </tbody>
         </table>
       </div>
-
-      {/* Pagination */}
-      {!loading && filteredTuitionList.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "1rem 1.5rem",
-            borderTop: "1px solid #e5e7eb",
-            backgroundColor: "white",
-            borderBottomLeftRadius: "0.5rem",
-            borderBottomRightRadius: "0.5rem",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "0.875rem",
-              color: "#6b7280",
-            }}
-          >
-            Hiển thị {indexOfFirstItem + 1} -{" "}
-            {Math.min(indexOfLastItem, filteredTuitionList.length)} trong{" "}
-            {filteredTuitionList.length} khoản học phí
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button
-              onClick={() => paginate(currentPage - 1)}
-              disabled={currentPage === 1 || loading}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: currentPage === 1 ? "#f3f4f6" : "white",
-                color: currentPage === 1 ? "#9ca3af" : "#374151",
-                border: "1px solid #d1d5db",
-                borderRadius: "0.375rem",
-                cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                fontSize: "0.875rem",
-                transition: "all 0.2s ease",
-              }}
-            >
-              Trước
-            </button>
-
-            {totalPages > 1 && (
-              <div style={{ display: "flex", gap: "0.25rem" }}>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = i + 1;
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => paginate(pageNum)}
-                      style={{
-                        width: "2.5rem",
-                        height: "2.5rem",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor:
-                          currentPage === pageNum ? "#3b82f6" : "white",
-                        color: currentPage === pageNum ? "white" : "#374151",
-                        border: "1px solid #d1d5db",
-                        borderRadius: "0.375rem",
-                        cursor: "pointer",
-                        fontSize: "0.875rem",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            <button
-              onClick={() => paginate(currentPage + 1)}
-              disabled={currentPage === totalPages || loading}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor:
-                  currentPage === totalPages ? "#f3f4f6" : "white",
-                color: currentPage === totalPages ? "#9ca3af" : "#374151",
-                border: "1px solid #d1d5db",
-                borderRadius: "0.375rem",
-                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                fontSize: "0.875rem",
-                transition: "all 0.2s ease",
-              }}
-            >
-              Sau
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Tuition Detail Modal */}
       {showTuitionDetail && selectedTuition && (

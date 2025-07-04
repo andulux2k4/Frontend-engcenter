@@ -386,7 +386,33 @@ class ApiService {
   }
 
   async deleteUser(token, userId, role = null) {
-    return await this.apiCall(`/v1/api/users/${userId}`, {
+    // Use role-specific endpoints for deletion
+    let endpoint;
+
+    if (role) {
+      switch (role.toLowerCase()) {
+        case "student":
+          endpoint = `/v1/api/students/${userId}`;
+          break;
+        case "teacher":
+          endpoint = `/v1/api/teachers/${userId}`;
+          break;
+        case "parent":
+          endpoint = `/v1/api/parents/${userId}`;
+          break;
+        case "admin":
+          endpoint = `/v1/api/users/${userId}`; // Admin might use the general endpoint
+          break;
+        default:
+          endpoint = `/v1/api/users/${userId}`; // Fallback to general endpoint
+      }
+    } else {
+      endpoint = `/v1/api/users/${userId}`; // Fallback if no role provided
+    }
+
+    console.log(`🗑️ Delete API endpoint: DELETE ${endpoint}`);
+
+    return await this.apiCall(endpoint, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,

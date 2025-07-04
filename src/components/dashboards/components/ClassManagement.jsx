@@ -10,7 +10,7 @@ import {
   FiClock,
   FiMapPin,
   FiUsers,
-  FiCheckCircle,
+  FiCheck,
   FiDollarSign,
 } from "react-icons/fi";
 import { BiMoney } from "react-icons/bi";
