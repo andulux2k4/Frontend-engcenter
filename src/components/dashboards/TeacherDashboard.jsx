@@ -1,305 +1,329 @@
-import React, { useState, useEffect } from 'react'
-import apiService from '../../services/api'
-import '../Dashboard.css'
-import '../../styles/dashboard/teacher.css'
-import { FiUser, FiLogOut, FiEdit, FiTrash2, FiEye, FiUsers, FiPhone, FiMail, FiLock, FiSave, FiX, FiBook, FiCalendar, FiClock, FiMapPin, FiBarChart2, FiFileText, FiCheckCircle, FiChevronLeft, FiChevronRight, FiLoader } from 'react-icons/fi'
-import { HiAcademicCap } from 'react-icons/hi'
-import { BsGraphUp } from 'react-icons/bs'
+import { FiBook, FiClock, FiX, FiUser, FiHome, FiLogOut, FiBell } from 'react-icons/fi';
+import ProfileModal from './components/modals/ProfileModal';
+import NotificationModal from './components/modals/NotificationModal';
+import { MdNotifications } from 'react-icons/md';
 
-function TeacherDashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState('classes')
-  const [selectedDate, setSelectedDate] = useState(null)
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [loading, setLoading] = useState(false)
+import React, { useState, useEffect } from 'react';
+import apiService from '../../services/api';
+import '../Dashboard.css';
+import '../../styles/dashboard/teacher.css';
+import { FiLoader, FiBarChart2, FiCalendar, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import TeacherOverview from './components/TeacherOverview';
+import ClassesList from './components/ClassesList';
+import { HiAcademicCap } from 'react-icons/hi';
+import ScheduleSection from './components/ScheduleSection';
+import SalarySection from './components/SalarySection';
+
+function TeacherDashboard({ user, onLogout, onGoHome }) {
+  const [activeTab, setActiveTab] = useState('classes');
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [loading, setLoading] = useState(false);
+
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showClassDetail, setShowClassDetail] = useState(false);
+  const [selectedClass, setSelectedClass] = useState(null);
   const [apiData, setApiData] = useState({
     classes: [],
     students: [],
     schedule: {}
   })
   const [error, setError] = useState(null)
+  const navigate = useNavigate()
+  const [selectedSalaryMonth, setSelectedSalaryMonth] = useState({month: 'all', year: 'all'})
+  const [salaryPage, setSalaryPage] = useState(1);
+  const salaryPerPage = 5;
+
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [myNotifications, setMyNotifications] = useState([]);
+  const [loadingMyNotifications, setLoadingMyNotifications] = useState(false);
 
   // Fetch API data khi component mount và khi tab thay đổi
   useEffect(() => {
+    // Log user info for debugging
+    console.log('👤 User info after login:', user);
     const fetchData = async () => {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
 
       try {
         // Test connection trước
-        console.log('🧪 Kiểm tra kết nối server...')
-        const isConnected = await apiService.testConnection()
-        
-        if (!isConnected) {
-          console.warn('⚠️ Không thể kết nối server hoặc có CORS issue, sử dụng mock data')
-          setError('Demo Mode: Đang hiển thị dữ liệu mẫu do CORS policy.')
-          
-          // Fallback to mock data
-          if (activeTab === 'classes') {
-            setApiData(prev => ({ ...prev, classes: getMockClasses() }))
-          } else if (activeTab === 'schedule') {
-            setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
-          }
-          setLoading(false)
-          return
+        console.log('🧪 Kiểm tra kết nối server...');
+        const connectionResult = await apiService.testConnection();
+        if (!connectionResult.success) {
+          throw new Error('Không thể kết nối server: ' + (connectionResult.message || ''));
         }
-        
-        console.log('✅ Server connection OK, kiểm tra authentication...')
-        
-        // Kiểm tra đăng nhập
-        const token = await apiService.ensureAuthentication()
-        
-        if (!token) {
-          console.warn('⚠️ Không thể đăng nhập, sử dụng mock data')
-          setError('Demo Mode: Không thể đăng nhập. Đang hiển thị dữ liệu mẫu.')
-          
-          // Fallback to mock data
-          if (activeTab === 'classes') {
-            setApiData(prev => ({ ...prev, classes: getMockClasses() }))
-          } else if (activeTab === 'schedule') {
-            setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
-          }
-          setLoading(false)
-          return
-        }
+        console.log('✅ Server connection OK, kiểm tra authentication...');
 
-        console.log('✅ Token hợp lệ, tiếp tục gọi API...')
+        // Lấy danh sách lớp dạy từ API (dùng teacherId)
+        let classes = [];
+        let schedule = {};
 
-        if (activeTab === 'classes') {
-          console.log('🔄 Đang lấy danh sách lớp học...')
-          const response = await apiService.getTeacherClasses(token)
-          
-          if (response.success) {
-            console.log('✅ Lấy lớp học thành công:', response.classes.length, 'lớp')
-            console.log('📚 Classes data:', response.classes)
-            setApiData(prev => ({ ...prev, classes: response.classes }))
-            setError(null) // Clear any previous errors
-          } else {
-            console.warn('⚠️ API lỗi, fallback về mock data:', response.message)
-            setError(`API Error: ${response.message}. Đang hiển thị dữ liệu mẫu.`)
-            setApiData(prev => ({ ...prev, classes: getMockClasses() }))
-          }
-        } else if (activeTab === 'schedule') {
-          console.log('🔄 Đang lấy lịch dạy...')
-          const response = await apiService.getTeacherSchedule(token)
-          
-          if (response.success) {
-            console.log('✅ Lấy lịch dạy thành công:', Object.keys(response.schedule).length, 'ngày có lịch')
-            console.log('📅 Schedule data:', response.schedule)
-            setApiData(prev => ({ ...prev, schedule: response.schedule }))
-            setError(null) // Clear any previous errors
-          } else {
-            console.warn('⚠️ API lỗi, fallback về mock data:', response.message)
-            setError(`API Error: ${response.message}. Đang hiển thị dữ liệu mẫu.`)
-            setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
-          }
-        }
-      } catch (error) {
-        console.error('❌ Lỗi khi gọi API:', error)
-        
-        // Handle different types of errors
-        if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-          setError('Demo Mode: CORS policy chặn kết nối. Đang hiển thị dữ liệu mẫu.')
-        } else if (error.message.includes('403') || error.message.includes('401')) {
-          setError('Demo Mode: Phiên đăng nhập không hợp lệ. Đang hiển thị dữ liệu mẫu.')
-          apiService.removeToken()
-        } else {
-          setError('Demo Mode: Lỗi kết nối server. Đang hiển thị dữ liệu mẫu.')
-        }
-        
-        // Always fallback to mock data on error
-        if (activeTab === 'classes') {
-          setApiData(prev => ({ ...prev, classes: getMockClasses() }))
-        } else if (activeTab === 'schedule') {
-          setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [activeTab])
-
-  // Refresh schedule khi thay đổi tháng
-  useEffect(() => {
-    if (activeTab === 'schedule') {
-      const fetchSchedule = async () => {
-        const token = apiService.getToken()
-        if (!token) {
-          console.warn('⚠️ Không có token, sử dụng mock schedule')
-          setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
-          return
-        }
-
-        setLoading(true)
+        // Log raw API data for debugging (move after res is defined)
         try {
-          const response = await apiService.getTeacherSchedule(token)
-          if (response.success) {
-            setApiData(prev => ({ ...prev, schedule: response.schedule }))
-          } else {
-            console.warn('⚠️ Lỗi API, fallback mock schedule:', response.message)
-            setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
+          // Always use user.roleId as teacherId for API calls
+          const teacherId = user?.roleId;
+          if (!teacherId) {
+            throw new Error('Không tìm thấy teacherId (user.roleId) trong thông tin người dùng.');
           }
-        } catch (error) {
-          console.error('❌ Lỗi khi lấy lịch:', error)
-          setApiData(prev => ({ ...prev, schedule: getMockSchedule() }))
-        } finally {
-          setLoading(false)
+          // Fix: Nếu user.roleData?.classId có dữ liệu, fetch từng classId nếu API trả về rỗng
+          let res = await apiService.getTeacherClasses(apiService.getToken(), teacherId);
+          console.log('📦 API lớp học trả về:', res);
+          if (res && Array.isArray(res.data) && res.data.length === 0 && Array.isArray(user?.roleData?.classId) && user.roleData.classId.length > 0) {
+            // Nếu API trả về rỗng nhưng user có classId, thử fetch từng classId
+            const classDetails = [];
+            const forbiddenClassIds = [];
+            for (const classId of user.roleData.classId) {
+              try {
+                const classRes = await apiService.getClassById(apiService.getToken(), classId);
+                if (classRes && classRes.data) classDetails.push(classRes.data);
+              } catch (e) {
+                // Nếu lỗi là 403, lưu lại classId bị cấm truy cập
+                if (e && e.message && e.message.includes('403')) {
+                  forbiddenClassIds.push(classId);
+                }
+                // Bỏ qua các lỗi khác
+              }
+            }
+            classes = classDetails;
+            // Nếu tất cả classId đều bị forbidden, báo lỗi rõ ràng
+            if (classes.length === 0 && forbiddenClassIds.length === user.roleData.classId.length) {
+              throw new Error('Bạn đã được phân công vào các lớp học nhưng không có quyền xem thông tin các lớp này.\n\nNguyên nhân có thể là do bạn chưa được cấp quyền truy cập vào các lớp này trên hệ thống.\n\nVui lòng liên hệ quản trị viên hoặc bộ phận kỹ thuật để được hỗ trợ cấp quyền truy cập.');
+            } else if (forbiddenClassIds.length > 0) {
+              setError('Một số lớp bạn được phân công không thể truy cập do thiếu quyền truy cập.\n\nDanh sách lớp không truy cập được: ' + forbiddenClassIds.join(', ') + '\n\nVui lòng liên hệ quản trị viên hoặc bộ phận kỹ thuật để được hỗ trợ.');
+            }
+          } else if (res && res.data && Array.isArray(res.data)) {
+            // Log raw API data for debugging
+            console.log('🟢 API lớp học trả về (raw):', res.data);
+            classes = res.data;
+            // Log class schedulePreview for each class
+            classes.forEach(cls => {
+            });
+          } else {
+            throw new Error('Dữ liệu lớp học trả về không hợp lệ.');
+          }
+          // Build schedule object from all classes
+          for (const cls of classes) {
+            if (cls.schedule && cls.schedule.daysOfLessonInWeek && cls.schedule.startDate && cls.schedule.endDate) {
+              // Generate all dates for this class's schedule
+              const start = new Date(cls.schedule.startDate);
+              const end = new Date(cls.schedule.endDate);
+              for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                if (cls.schedule.daysOfLessonInWeek.includes(d.getDay())) {
+                  const dateKey = d.toISOString().split('T')[0];
+                  if (!schedule[dateKey]) schedule[dateKey] = [];
+                  schedule[dateKey].push({
+                    id: cls.id,
+                    class: cls.className,
+                    time: cls.schedule.time || '',
+                    room: cls.room || '',
+                    topic: cls.schedule.topic || '',
+                    studentCount: cls.students ? (Array.isArray(cls.students) ? cls.students.length : cls.students) : undefined
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          setError('Không thể lấy danh sách lớp học từ server. ' + (err && err.message ? err.message : ''));
+          classes = [];
+          schedule = {};
         }
+        setApiData({
+          classes: classes && classes.length > 0 ? classes : [],
+          students: [],
+          schedule: schedule || {},
+        });
+      } catch (error) {
+        setError('Lỗi khi tải dữ liệu: ' + (error.message || error.toString()));
+        setApiData({
+          classes: [],
+          students: [],
+          schedule: {},
+        });
+      } finally {
+        setLoading(false);
       }
+    };
+    fetchData();
+  }, [activeTab, user]);
 
-      fetchSchedule()
-    }
-  }, [currentMonth, activeTab])
+  // Khi đổi tháng ở tab schedule, không cần gọi lại API riêng, chỉ cần giữ schedule từ classes
+  useEffect(() => {
+    // No-op: schedule is always built from classes
+  }, [currentMonth, activeTab, user]);
 
-  // Mock data functions
-  const getMockClasses = () => [
-    {
-      id: 'mock-1',
-      className: 'IELTS Advanced',
-      schedule: 'T2,T4,T6 - 18:00-20:00',
-        room: 'Phòng 101',
-        students: '15/20',
-        level: 'Upper Intermediate',
-      status: 'Đang dạy',
-      isAvailable: true
-    },
-    {
-      id: 'mock-2', 
-      className: 'TOEIC Preparation',
-      schedule: 'T3,T5,T7 - 17:30-19:30',
-        room: 'Phòng 203',
-        students: '12/15',
-        level: 'Intermediate',
-      status: 'Đang dạy',
-      isAvailable: true
-    }
-  ]
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      setLoadingNotifications(true);
+      try {
+        const token = apiService.getToken();
+        const res = await apiService.getNotificationsForRole(token);
+        if (res && res.data && Array.isArray(res.data)) {
+          setNotifications(res.data);
+        } else if (res && res.notifications && Array.isArray(res.notifications)) {
+          setNotifications(res.notifications);
+        } else {
+          setNotifications([]);
+        }
+      } catch (e) {
+        setNotifications([]);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    };
+    fetchNotifications();
+  }, []);
 
-  const getMockSchedule = () => {
-    const schedule = {}
-    const today = new Date()
-    const currentMonth = today.getMonth()
-    const currentYear = today.getFullYear()
-    
-    // Tạo mock schedule cho tháng hiện tại
-    const mockSessions = [
-      { day: 2, class: 'IELTS Advanced', time: '18:00-20:00', room: 'Phòng 101', topic: 'Speaking Practice' },
-      { day: 3, class: 'TOEIC Preparation', time: '17:30-19:30', room: 'Phòng 203', topic: 'Reading Skills' },
-      { day: 4, class: 'IELTS Advanced', time: '18:00-20:00', room: 'Phòng 101', topic: 'Writing Task 1' },
-      { day: 5, class: 'TOEIC Preparation', time: '17:30-19:30', room: 'Phòng 203', topic: 'Listening Practice' },
-      { day: 6, class: 'IELTS Advanced', time: '18:00-20:00', room: 'Phòng 101', topic: 'Grammar Review' },
-      { day: 7, class: 'TOEIC Preparation', time: '17:30-19:30', room: 'Phòng 203', topic: 'Mock Test' }
-    ]
-
-    // Tạo lịch cho cả tháng
-    for (let day = 1; day <= 31; day++) {
-      const date = new Date(currentYear, currentMonth, day)
-      if (date.getMonth() === currentMonth) { // Chỉ tạo cho tháng hiện tại
-        const dayOfWeek = date.getDay() // 0=CN, 1=T2, ..., 6=T7
+  // Fetch my notifications (notifications created by this user)
+  useEffect(() => {
+    const fetchMyNotifications = async () => {
+      if (activeTab !== 'my-notifications') return;
+      
+      setLoadingMyNotifications(true);
+      try {
+        const token = apiService.getToken();
+        const res = await apiService.getMyNotifications(token);
+        console.log('📢 My notifications response:', res);
         
-        const session = mockSessions.find(s => s.day === dayOfWeek)
-        if (session) {
-          const dateKey = date.toISOString().split('T')[0]
-          schedule[dateKey] = [{
-            id: `mock-${dateKey}`,
-            class: session.class,
-            time: session.time,
-            room: session.room,
-            topic: session.topic,
-            studentCount: Math.floor(Math.random() * 15) + 10
-          }]
+        if (res && res.data && Array.isArray(res.data)) {
+          setMyNotifications(res.data);
+        } else if (res && res.notifications && Array.isArray(res.notifications)) {
+          setMyNotifications(res.notifications);
+        } else {
+          setMyNotifications([]);
+        }
+      } catch (e) {
+        console.error('❌ Error fetching my notifications:', e);
+        setMyNotifications([]);
+      } finally {
+        setLoadingMyNotifications(false);
+      }
+    };
+    fetchMyNotifications();
+  }, [activeTab]);
+
+  // Hàm tạo calendar tháng, lấy dữ liệu lịch học từ các lớp
+  const generateCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const today = new Date();
+
+    // Chuẩn bị map ngày -> danh sách lớp học có buổi học hôm đó
+    const classScheduleMap = {};
+    // Nếu có trường schedulePreview thì parse để lấy thứ/ngày dạy
+    apiData.classes.forEach(cls => {
+      if (cls.schedulePreview) {
+        // Ví dụ: "T2, T4, T6 (11/8/2025 - 19/11/2025)"
+        const match = cls.schedulePreview.match(/([T2-7, ]+)\s*\((\d{1,2}\/\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{4})\)/);
+        if (match) {
+          const daysOfWeekStr = match[1].replace(/\s/g, ''); // "T2,T4,T6"
+          const startDateStr = match[2];
+          const endDateStr = match[3];
+          // Chuyển "T2,T4,T6" thành mảng số thứ trong tuần (T2=1, ..., T7=6, CN=0)
+          const dayMap = { 'CN': 0, 'T2': 1, 'T3': 2, 'T4': 3, 'T5': 4, 'T6': 5, 'T7': 6 };
+          const daysOfWeek = daysOfWeekStr.split(',').map(d => dayMap[d]).filter(d => d !== undefined);
+          const [d1, m1, y1] = startDateStr.split('/').map(Number);
+          const [d2, m2, y2] = endDateStr.split('/').map(Number);
+          const start = new Date(y1, m1 - 1, d1);
+          const end = new Date(y2, m2 - 1, d2);
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            if (daysOfWeek.includes(d.getDay())) {
+              const dateKey = d.toISOString().split('T')[0];
+              if (!classScheduleMap[dateKey]) classScheduleMap[dateKey] = [];
+              classScheduleMap[dateKey].push({
+                id: cls._id || cls.id,
+                class: cls.className,
+                time: cls.schedule && cls.schedule.time ? cls.schedule.time : '',
+                room: cls.room || '',
+                topic: cls.schedule && cls.schedule.topic ? cls.schedule.topic : '',
+                studentCount: cls.studentCount || (cls.students ? (Array.isArray(cls.students) ? cls.students.length : cls.students) : undefined)
+              });
+            }
+          }
+        }
+      } else if (cls.schedule && cls.schedule.daysOfLessonInWeek && cls.schedule.startDate && cls.schedule.endDate) {
+        // Fallback: dùng schedule gốc nếu có
+        const start = new Date(cls.schedule.startDate);
+        const end = new Date(cls.schedule.endDate);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          if (cls.schedule.daysOfLessonInWeek.includes(d.getDay())) {
+            const dateKey = d.toISOString().split('T')[0];
+            if (!classScheduleMap[dateKey]) classScheduleMap[dateKey] = [];
+            classScheduleMap[dateKey].push({
+              id: cls._id || cls.id,
+              class: cls.className,
+              time: cls.schedule.time || '',
+              room: cls.room || '',
+              topic: cls.schedule.topic || '',
+              studentCount: cls.studentCount || (cls.students ? (Array.isArray(cls.students) ? cls.students.length : cls.students) : undefined)
+            });
+          }
         }
       }
-    }
-    
-    return schedule
-  }
+    });
 
-  // Mock data fallback cho development
-  const mockData = {
-    students: [
-      {
-        id: 1,
-        name: 'Nguyễn Văn A',
-        class: 'IELTS Advanced',
-        attendance: '90%',
-        progress: 'Tốt',
-        currentScore: 6.5
-      },
-      {
-        id: 2,
-        name: 'Trần Thị B',
-        class: 'TOEIC Preparation',
-        attendance: '85%',
-        progress: 'Khá',
-        currentScore: 650
-      }
-    ]
-  }
-
-  // Hàm tạo calendar tháng
-  const generateCalendarDays = () => {
-    const year = currentMonth.getFullYear()
-    const month = currentMonth.getMonth()
-    const today = new Date()
-    
     // Ngày đầu tiên của tháng
-    const firstDay = new Date(year, month, 1)
+    const firstDay = new Date(year, month, 1);
     // Ngày cuối cùng của tháng
-    const lastDay = new Date(year, month + 1, 0)
-    
+    const lastDay = new Date(year, month + 1, 0);
     // Thứ của ngày đầu tiên (0 = Chủ nhật, 1 = Thứ 2, ...)
-    const startDay = firstDay.getDay()
-    const daysInMonth = lastDay.getDate()
-    
-    const days = []
-    
+    const startDay = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
+    const days = [];
+
     // Thêm các ngày của tháng trước để fill tuần đầu
-    const prevMonth = new Date(year, month - 1, 0)
-    const daysInPrevMonth = prevMonth.getDate()
-    
+    const prevMonth = new Date(year, month - 1, 0);
+    const daysInPrevMonth = prevMonth.getDate();
     for (let i = startDay - 1; i >= 0; i--) {
-      const date = new Date(year, month - 1, daysInPrevMonth - i)
+      const date = new Date(year, month - 1, daysInPrevMonth - i);
+      const dateKey = date.toISOString().split('T')[0];
       days.push({
         date: date.getDate(),
         fullDate: date,
         isCurrentMonth: false,
         isToday: false,
-        hasSchedule: false
-      })
+        hasSchedule: !!classScheduleMap[dateKey],
+        scheduleCount: classScheduleMap[dateKey] ? classScheduleMap[dateKey].length : 0,
+        scheduleList: classScheduleMap[dateKey] || []
+      });
     }
-    
+
     // Thêm các ngày của tháng hiện tại
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      const dateKey = date.toISOString().split('T')[0]
-      
+      const date = new Date(year, month, day);
+      const dateKey = date.toISOString().split('T')[0];
       days.push({
         date: day,
         fullDate: date,
         isCurrentMonth: true,
         isToday: date.toDateString() === today.toDateString(),
-        hasSchedule: apiData.schedule[dateKey] && apiData.schedule[dateKey].length > 0,
-        scheduleCount: apiData.schedule[dateKey] ? apiData.schedule[dateKey].length : 0
-      })
+        hasSchedule: !!classScheduleMap[dateKey],
+        scheduleCount: classScheduleMap[dateKey] ? classScheduleMap[dateKey].length : 0,
+        scheduleList: classScheduleMap[dateKey] || []
+      });
     }
-    
+
     // Thêm các ngày của tháng sau để fill tuần cuối
-    const remainingDays = 42 - days.length // 6 tuần * 7 ngày
+    const remainingDays = 42 - days.length; // 6 tuần * 7 ngày
     for (let day = 1; day <= remainingDays; day++) {
-      const date = new Date(year, month + 1, day)
+      const date = new Date(year, month + 1, day);
+      const dateKey = date.toISOString().split('T')[0];
       days.push({
         date: day,
         fullDate: date,
         isCurrentMonth: false,
         isToday: false,
-        hasSchedule: false
-      })
+        hasSchedule: !!classScheduleMap[dateKey],
+        scheduleCount: classScheduleMap[dateKey] ? classScheduleMap[dateKey].length : 0,
+        scheduleList: classScheduleMap[dateKey] || []
+      });
     }
-    
-    return days
-  }
+    return days;
+  };
 
   const calendarDays = generateCalendarDays()
   const monthNames = [
@@ -323,11 +347,14 @@ function TeacherDashboard({ user, onLogout }) {
     setSelectedDate(null)
   }
 
+  // Lấy danh sách lớp học có lịch học trong ngày được chọn
   const getSelectedDateSchedule = () => {
-    if (!selectedDate) return []
-    const dateKey = selectedDate.toISOString().split('T')[0]
-    return apiData.schedule[dateKey] || []
-  }
+    if (!selectedDate) return [];
+    // const dateKey = selectedDate.toISOString().split('T')[0];
+    // Dùng lịch đã build từ generateCalendarDays
+    const found = calendarDays.find(day => day.fullDate.toDateString() === selectedDate.toDateString());
+    return found && found.scheduleList ? found.scheduleList : [];
+  };
 
   // Loading component
   const LoadingSpinner = () => (
@@ -361,13 +388,15 @@ function TeacherDashboard({ user, onLogout }) {
     </div>
   )
 
+  // Sửa lỗi: Đăng xuất phải xóa token và reload về trang login
   const handleLogout = () => {
-    apiService.removeToken()
-    window.location.href = '/login'
-  }
+    apiService.removeToken();
+    if (typeof onLogout === 'function') onLogout();
+    window.location.href = '/login';
+  };
 
   const formatSchedule = (schedule) => {
-    if (!schedule) return 'Chưa có lịch học'
+    if (!schedule) return 'Chưa có lịch học'  
     return schedule
   }
 
@@ -383,22 +412,221 @@ function TeacherDashboard({ user, onLogout }) {
     return <span className={`status-badge ${statusInfo.className}`}>{statusInfo.text}</span>
   }
 
-  return (
-    <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>
-          <FiUser className="icon" />
-          Giáo viên
-        </h1>
-        <div className="user-info">
-          <span>Xin chào, {user?.name}</span>
-          <button onClick={handleLogout} className="logout-btn">
-            <FiLogOut className="icon" />
-            Đăng xuất
-          </button>
-        </div>
-      </header>
+  const handleGoHome = () => {
+    navigate('/');
+    if (onGoHome) onGoHome();
+  };
 
+  // Dữ liệu mẫu nhiều tháng:
+  const salaryData = Array.from({length:18}, (_,i) => {
+    const now = new Date();
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const soBuoiDay = 15 + (i%5);
+    const luongMoiBuoi = 350000;
+    const daNhan = i%3===0 ? soBuoiDay*luongMoiBuoi : Math.floor(soBuoiDay*luongMoiBuoi*0.6);
+    const tongLuong = soBuoiDay * luongMoiBuoi;
+    const conLai = tongLuong - daNhan;
+    return {
+      key: i,
+      month: date.getMonth()+1,
+      year: date.getFullYear(),
+      soBuoiDay,
+      luongMoiBuoi,
+      daNhan,
+      conLai,
+      tongLuong,
+      trangThai: conLai > 0 ? 'Chưa thanh toán hết' : 'Đã thanh toán đủ',
+    };
+  });
+
+  // Component hiển thị danh sách thông báo đã tạo
+  const MyNotificationsSection = ({ myNotifications, loading, error, onRetry }) => {
+    if (loading) {
+      return (
+        <div className="section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <FiBell />
+              Thông báo đã tạo
+            </h2>
+          </div>
+          <div className="loading-container">
+            <FiLoader className="loading-spinner" />
+            <span>Đang tải danh sách thông báo...</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <FiBell />
+              Thông báo đã tạo
+            </h2>
+          </div>
+          <ErrorMessage message={error} onRetry={onRetry} />
+        </div>
+      );
+    }
+
+    const formatDate = (dateString) => {
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return dateString;
+      }
+    };
+
+    const getNotificationTypeBadge = (type) => {
+      const typeMap = {
+        'General': { text: 'Thông báo chung', color: '#007bff' },
+        'Emergency': { text: 'Khẩn cấp', color: '#dc3545' },
+        'Schedule': { text: 'Lịch học', color: '#28a745' },
+        'Event': { text: 'Sự kiện', color: '#ffc107' }
+      };
+      
+      const typeInfo = typeMap[type] || { text: type || 'Khác', color: '#6c757d' };
+      
+      return (
+        <span style={{
+          background: typeInfo.color,
+          color: 'white',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontSize: '0.8rem',
+          fontWeight: '600'
+        }}>
+          {typeInfo.text}
+        </span>
+      );
+    };
+
+    return (
+      <div className="section">
+        <div className="section-header">
+          <h2 className="section-title">
+            <FiBell />
+            Thông báo đã tạo
+          </h2>
+          <p className="section-subtitle">
+            Danh sách các thông báo bạn đã tạo ({myNotifications.length})
+          </p>
+        </div>
+
+        {myNotifications.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '3rem',
+            color: '#666',
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #e9ecef'
+          }}>
+            <FiBell size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+              Chưa có thông báo nào được tạo
+            </p>
+            <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+              Các thông báo bạn tạo sẽ hiển thị tại đây
+            </p>
+          </div>
+        ) : (
+          <div className="notifications-grid">
+            {myNotifications.map((notification, index) => (
+              <div key={notification._id || notification.id || index} className="notification-card" style={{
+                background: 'white',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                marginBottom: '1rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ 
+                      margin: '0 0 0.5rem 0', 
+                      color: '#b30000',
+                      fontSize: '1.1rem',
+                      fontWeight: '600'
+                    }}>
+                      {notification.title || 'Không có tiêu đề'}
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {getNotificationTypeBadge(notification.type)}
+                      <span style={{ 
+                        fontSize: '0.85rem', 
+                        color: '#666',
+                        background: '#f8f9fa',
+                        padding: '2px 6px',
+                        borderRadius: '3px'
+                      }}>
+                        {formatDate(notification.createdAt || notification.date)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: '1rem' }}>
+                  <p style={{ 
+                    margin: 0, 
+                    lineHeight: '1.5',
+                    color: '#333'
+                  }}>
+                    {notification.content || notification.message || 'Không có nội dung'}
+                  </p>
+                </div>
+
+                {notification.targetRoles && notification.targetRoles.length > 0 && (
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e9ecef' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: '600' }}>
+                      Gửi đến: 
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                      {notification.targetRoles.map((role, idx) => (
+                        <span key={idx} style={{
+                          background: '#e3f2fd',
+                          color: '#1976d2',
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          fontSize: '0.8rem'
+                        }}>
+                          {role === 'Student' ? 'Học viên' : 
+                           role === 'Parent' ? 'Phụ huynh' : 
+                           role === 'Teacher' ? 'Giáo viên' : 
+                           role === 'Admin' ? 'Quản trị viên' : role}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+ 
+  return (
+    <div className="dashboard teacher-dashboard">
+      <TeacherOverview
+        user={user}
+        showProfileModal={showProfileModal}
+        setShowProfileModal={setShowProfileModal}
+        onGoHome={handleGoHome}
+        onLogout={handleLogout}
+      />
       <div className="dashboard-content">
         <aside className="sidebar">
           <nav className="nav-menu">
@@ -416,223 +644,140 @@ function TeacherDashboard({ user, onLogout }) {
               <FiCalendar className="icon" />
               Lịch dạy
             </button>
+            <button 
+              className={`nav-item ${activeTab === 'salary' ? 'active' : ''}`}
+              onClick={() => setActiveTab('salary')}
+            >
+              <FiBarChart2 className="icon" />
+              Lương của tôi
+            </button>
+            <button 
+              className={`nav-item ${activeTab === 'my-notifications' ? 'active' : ''}`}
+              onClick={() => setActiveTab('my-notifications')}
+            >
+              <FiBell className="icon" />
+              Thông báo đã tạo
+            </button>
           </nav>
+          
+          {/* Navigation menu ở góc dưới sidebar */}
+          <div className="sidebar-bottom-nav">
+          <button 
+              className="nav-item"
+              onClick={() => handleGoHome()}
+            >
+              <FiHome className="icon" />
+              Trang chủ
+            </button>
+            <button 
+              className="nav-item"
+              onClick={() => setShowProfileModal(true)}
+            >
+              <FiUser className="icon" />
+              Hồ sơ
+            </button>
+            <button
+              className="nav-item"
+              style={{ position: 'relative' }}
+              onClick={() => setShowNotificationModal(true)}
+            >
+              <MdNotifications className="icon" />
+              Thông báo
+              {notifications.length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 12,
+                  background: '#b30000',
+                  color: 'white',
+                  borderRadius: '50%',
+                  fontSize: '0.8rem',
+                  width: 20,
+                  height: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700
+                }}>{notifications.length}</span>
+              )}
+            </button>
+            <button 
+              className="nav-item"
+              onClick={() => handleLogout()}
+            >
+              <FiLogOut className="icon" />
+              Đăng xuất
+            </button>
+          </div>
         </aside>
 
         <main className="main-content">
           {activeTab === 'classes' && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <HiAcademicCap className="icon" />
-                  Lớp học của tôi
-                </h2>
-              </div>
-
-              {loading ? (
-                <LoadingSpinner />
-              ) : error ? (
-                <ErrorMessage 
-                  message={error} 
-                  onRetry={() => window.location.reload()} 
-                />
-              ) : apiData.classes.length === 0 ? (
-                <div className="no-data-container">
-                  <p>Bạn chưa được phân công lớp học nào.</p>
-                </div>
-              ) : (
-              <div className="card-grid">
-                  {apiData.classes.map(classItem => (
-                  <div key={classItem.id} className="card">
-                    <div className="card-content">
-                      <h3>
-                        <FiBook className="icon" />
-                          {classItem.className}
-                      </h3>
-                      <p>
-                        <FiClock className="icon" />
-                        <span>Lịch học:</span>
-                          <span>{formatSchedule(classItem.schedule)}</span>
-                      </p>
-                      <p>
-                        <FiMapPin className="icon" />
-                        <span>Phòng:</span>
-                        <span>{classItem.room}</span>
-                      </p>
-                      <p>
-                        <FiUsers className="icon" />
-                        <span>Học viên:</span>
-                        <span>{classItem.students}</span>
-                      </p>
-                      <p>
-                        <BsGraphUp className="icon" />
-                        <span>Trình độ:</span>
-                        <span>{classItem.level}</span>
-                      </p>
-                      <div className="status-container">
-                          {getStatusBadge(classItem.status)}
-                      </div>
-                    </div>
-                    <div className="action-buttons" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' ,padding: 0, marginTop: '0px'}}>
-                      <button className="btn btn-secondary" style={{marginLeft: '55px'}}>
-                        <FiEye className="icon" />
-                        Chi tiết
-                      </button>
-                      <button className="btn btn-primary" style={{marginRight: '55px'}}>
-                        <FiBook className="icon" />
-                        Điểm danh
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              )}
-            </section>
+            <ClassesList
+              classes={apiData.classes}
+              loading={loading}
+              error={error}
+              onRetry={() => window.location.reload()}
+              onShowClassDetail={classItem => { setSelectedClass(classItem); setShowClassDetail(true); }}
+              showClassDetail={showClassDetail}
+              selectedClass={selectedClass}
+              onCloseClassDetail={() => setShowClassDetail(false)}
+              getStatusBadge={getStatusBadge}
+              formatSchedule={formatSchedule}
+            />
           )}
-
-
           {activeTab === 'schedule' && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <FiCalendar className="icon" />
-                  Lịch dạy
-                </h2>
-                <div className="section-actions">
-                  <button className="btn btn-primary">
-                    <FiCalendar className="icon" />
-                    Thêm lịch
-                  </button>
-                </div>
-              </div>
-              
-              {loading ? (
-                <LoadingSpinner />
-              ) : error ? (
-                <ErrorMessage 
-                  message={error} 
-                  onRetry={() => window.location.reload()} 
-                />
-              ) : (
-                <div className="calendar-monthly-container">
-                  {/* Calendar Header */}
-                  <div className="calendar-monthly-header">
-                    <button className="month-nav-btn" onClick={handlePrevMonth}>
-                      <FiChevronLeft />
-                    </button>
-                    <h3 className="month-year">
-                      {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                    </h3>
-                    <button className="month-nav-btn" onClick={handleNextMonth}>
-                      <FiChevronRight />
-                    </button>
-                  </div>
-
-                  {/* Days of week header */}
-                  <div className="calendar-weekdays">
-                    <div className="weekday">CN</div>
-                    <div className="weekday">T2</div>
-                    <div className="weekday">T3</div>
-                    <div className="weekday">T4</div>
-                    <div className="weekday">T5</div>
-                    <div className="weekday">T6</div>
-                    <div className="weekday">T7</div>
-                  </div>
-
-                  {/* Calendar Grid */}
-                  <div className="calendar-monthly-grid">
-                    {calendarDays.map((day, index) => (
-                      <div
-                        key={index}
-                        className={`calendar-monthly-day ${day.isCurrentMonth ? 'current-month' : 'other-month'} ${day.isToday ? 'today' : ''} ${day.hasSchedule ? 'has-schedule' : ''} ${selectedDate && selectedDate.toDateString() === day.fullDate.toDateString() ? 'selected' : ''}`}
-                        onClick={() => handleDateClick(day)}
-                      >
-                        <span className="day-number">{day.date}</span>
-                        {day.hasSchedule && day.isCurrentMonth && (
-                          <div className="schedule-indicator">
-                            <div className="schedule-dot"></div>
-                            {day.scheduleCount > 1 && (
-                              <span className="schedule-count">+{day.scheduleCount - 1}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Selected Date Details */}
-                  {selectedDate && (
-                    <div className="selected-date-details">
-                      <div className="details-header">
-                        <h4>
-                          <FiCalendar className="icon" />
-                          {selectedDate.toLocaleDateString('vi-VN', { 
-                            weekday: 'long', 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })}
-                        </h4>
-                        <button 
-                          className="close-details"
-                          onClick={() => setSelectedDate(null)}
-                        >
-                          <FiX />
-                        </button>
-                      </div>
-                      
-                      <div className="details-content">
-                        {getSelectedDateSchedule().map(session => (
-                          <div key={session.id} className="detail-session">
-                            <div className="session-header">
-                              <div className="session-time">
-                                <FiClock className="icon" />
-                                {session.time}
-                              </div>
-                              <div className="session-class">
-                        <FiBook className="icon" />
-                        {session.class}
-                              </div>
-                            </div>
-                            
-                            <div className="session-details">
-                              <div className="detail-item">
-                        <FiMapPin className="icon" />
-                                <span>Phòng học: {session.room}</span>
-                              </div>
-                              <div className="detail-item">
-                        <FiFileText className="icon" />
-                                <span>Chủ đề: {session.topic}</span>
-                              </div>
-                              <div className="detail-item">
-                                <FiUsers className="icon" />
-                                <span>Số học viên: {session.studentCount || 'N/A'}</span>
-                              </div>
-                    </div>
-                            
-                            <div className="session-actions">
-                              <button className="btn btn-primary">
-                        <FiBook className="icon" />
-                                Vào lớp
-                      </button>
-                              <button className="btn btn-secondary">
-                        <FiFileText className="icon" />
-                                Tài liệu
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
+            <ScheduleSection
+              calendarDays={calendarDays}
+              currentMonth={currentMonth}
+              monthNames={monthNames}
+              onPrevMonth={handlePrevMonth}
+              onNextMonth={handleNextMonth}
+              selectedDate={selectedDate}
+              onDateClick={handleDateClick}
+              getSelectedDateSchedule={getSelectedDateSchedule}
+              onCloseDateDetails={() => setSelectedDate(null)}
+              loading={loading}
+              error={error}
+              onRetry={() => window.location.reload()}
+              userRole="teacher"
+              apiData={apiData}
+            />
+          )}
+          {activeTab === 'salary' && (
+            <SalarySection
+              userData={user}
+              selectedSalaryMonth={selectedSalaryMonth}
+              setSelectedSalaryMonth={setSelectedSalaryMonth}
+              salaryPage={salaryPage}
+              setSalaryPage={setSalaryPage}
+              salaryPerPage={salaryPerPage}
+            />
+          )}
+          {activeTab === 'my-notifications' && (
+            <MyNotificationsSection
+              myNotifications={myNotifications}
+              loading={loadingMyNotifications}
+              error={error}
+              onRetry={() => window.location.reload()}
+            />
           )}
         </main>
       </div>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal user={user} onClose={() => setShowProfileModal(false)} />
+      )}
+
+      {/* Notification Modal */}
+      <NotificationModal 
+        isOpen={showNotificationModal} 
+        onClose={() => setShowNotificationModal(false)} 
+        user={user}
+      />
     </div>
   )
 }
 
-export default TeacherDashboard 
+export default TeacherDashboard

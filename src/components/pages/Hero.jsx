@@ -1,3 +1,5 @@
+
+import React from 'react';
 import '../../styles/pages/Hero.css'
 
 const Hero = () => {
@@ -8,8 +10,7 @@ const Hero = () => {
           <h1>Chinh Phục Tiếng Anh Cùng Chúng Tôi</h1>
           <p>Khám phá phương pháp học tiếng Anh hiệu quả, được thiết kế riêng cho người Việt</p>
           <div className="hero-buttons">
-            <button className="primary-button" style={{ backgroundColor: 'white', color: 'rgb(179, 0, 0)' }}>Đăng ký học thử miễn phí</button>
-            <button className="secondary-button" style={{ borderColor: 'white', color: 'white' }}>Tìm hiểu thêm</button>
+            
           </div>
           <div className="hero-stats">
             <div className="stat-item">
@@ -27,7 +28,7 @@ const Hero = () => {
           </div>
         </div>
         <div className="hero-image">
-          <img src="/ieltsFighter.jpg" alt="Students learning English" />
+          <img src="/fakeLogo.png" alt="Students learning English" />
         </div>
       </div>
     </section>

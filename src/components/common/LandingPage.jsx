@@ -5,12 +5,17 @@ import Features from '../pages/Features';
 import Courses from '../pages/Courses';
 import Testimonials from './Testimonials';
 import Contact from '../pages/Contact';
+import BannerCarousel from './BannerCarousel';
 
-const LandingPage = () => {
+const LandingPage = ({ user, onLogout, onGoHome }) => {
   return (
     <div className="landing-page">
-      <Navbar />
+      <Navbar user={user} onLogout={onLogout} onGoHome={onGoHome} />
       <main>
+        <div style={{ marginTop: '135px' }}>
+          {/* Banner Carousel ở đầu trang */}
+          <BannerCarousel />
+        </div>
         <Hero />
         <Features />
         <Courses />

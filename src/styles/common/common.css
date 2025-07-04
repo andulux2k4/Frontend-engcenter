@@ -1,3 +1,10 @@
+/* Đảm bảo tất cả dashboard admin, teacher, student, parent đều có min-height 645px */
+.admin-dashboard .main-content,
+.teacher-dashboard .main-content,
+.student-dashboard .main-content,
+.parent-dashboard .main-content {
+  min-height: 1000px !important;
+}
 /* Reset default margins and padding */
 * {
   margin: 0;

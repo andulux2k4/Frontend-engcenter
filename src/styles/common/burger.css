@@ -1,0 +1,88 @@
+.dashboard-burger-icon {
+  color: #fff !important;
+  font-size: 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.18));
+  border-radius: 12px;
+  box-sizing: border-box;
+  transition: box-shadow 0.2s, background 0.2s, transform 0.18s cubic-bezier(.4,2,.6,1), filter 0.18s;
+}
+
+.hamburger-btn {
+  background: rgba(0,0,0,0.18);
+  min-width: 60px;
+  min-height: 60px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.18s cubic-bezier(.4,2,.6,1);
+}
+
+.hamburger-btn:hover .dashboard-burger-icon,
+.hamburger-btn:focus .dashboard-burger-icon {
+  transform: scale(1.12) rotate(-8deg);
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.22));
+}
+
+.hamburger-btn:active .dashboard-burger-icon {
+  transform: scale(0.96) rotate(2deg);
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.28));
+}
+
+.hamburger-btn {
+  background: rgba(0,0,0,0.18);
+  min-width: 60px;
+  min-height: 60px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hamburger-btn:hover, .hamburger-btn:focus {
+  background: rgba(255,255,255,0.12);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+/* Burger (App Grid) Icon Styles for All Dashboards */
+.hamburger-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.hamburger-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 56px;
+  /* Ensure the icon is centered visually */
+}
+
+.hamburger-btn:focus {
+  outline: 2px solid #fff;
+}
+
+.hamburger-btn:hover {
+  background-color: rgb(255, 255, 255);
+}
+
+.hamburger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+

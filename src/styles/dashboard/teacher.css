@@ -1,3 +1,227 @@
+/* Bigger calendar styles for TeacherDashboard */
+.calendar-monthly-container {
+  max-width: 1200px;
+  min-width: 900px;
+  margin: 2.5rem auto 0 auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px #0001;
+  padding: 2.5rem 3.5rem 2.5rem 3.5rem;
+}
+.calendar-monthly-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+.month-year {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #b30000;
+}
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #b30000;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+.calendar-monthly-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1.2rem;
+  min-height: 520px;
+}
+.calendar-monthly-day {
+  background: #f8f9fa;
+  border-radius: 12px;
+  min-height: 100px;
+  font-size: 1.25rem;
+  text-align: left;
+  padding: 1.1rem 0.7rem 0.7rem 1.1rem;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 2px #0001;
+}
+.calendar-monthly-day.current-month {
+  background: #fff;
+}
+.calendar-monthly-day.today {
+  border: 2px solid #b30000;
+  background: #fff7f7;
+}
+.calendar-monthly-day.selected {
+  background: #ffeaea;
+  box-shadow: 0 2px 8px #b3000022;
+}
+.calendar-monthly-day.has-schedule {
+  border-left: 5px solid #b30000;
+}
+.day-number {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #b30000;
+}
+.schedule-indicator {
+  margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.schedule-dot {
+  width: 10px;
+  height: 10px;
+  background: #b30000;
+  border-radius: 50%;
+  display: inline-block;
+}
+.schedule-count {
+  font-size: 0.9rem;
+  color: #b30000;
+  font-weight: 600;
+}
+.selected-date-details {
+  margin-top: 2rem;
+  background: #fff7f7;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #b3000022;
+  padding: 1.5rem;
+}
+.details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.details-header h4 {
+  font-size: 1.2rem;
+  color: #b30000;
+  font-weight: 700;
+  margin: 0;
+}
+.close-details {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: #b30000;
+  cursor: pointer;
+}
+.details-content {
+  margin-top: 1rem;
+}
+.detail-session {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px #b3000011;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 0.7rem;
+}
+.session-time, .session-class {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #b30000;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.session-details {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.7rem;
+}
+.detail-item {
+  font-size: 0.98rem;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.session-actions {
+  display: flex;
+  gap: 1rem;
+}
+.session-actions .btn {
+  min-width: 110px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: stretch;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.card {
+  height: 100%;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0;
+  margin-top: 0;
+}
+
+/* Modal styles for class detail */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.3);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  min-width: 350px;
+  max-width: 500px;
+  box-shadow: 0 4px 24px #0002;
+  position: relative;
+}
+.modal-title {
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #b30000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+}
+.modal-label {
+  font-weight: 600;
+  padding: 6px 8px;
+}
+.modal-table td {
+  padding: 6px 8px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 @import '../common/common.css';
 
 .teacher-dashboard {
@@ -50,7 +274,7 @@
   margin-top: 64px;
   flex: 1;
   max-width: 1200px;
-  margin-left: auto;
+  margin-left: 0;
   margin-right: auto;
   width: 100%;
 }
@@ -61,15 +285,44 @@
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  height: fit-content;
-  position: sticky;
-  top: 80px;
+  height: calc(100vh - 64px);
+  position: fixed;
+  top: 64px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .teacher-nav-menu {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1;
+}
+
+/* Sidebar bottom navigation */
+.sidebar-bottom-nav {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-bottom-nav .nav-item {
+  background-color: #f8f9fa;
+  border: 1px solid #e5e7eb;
+}
+
+.sidebar-bottom-nav .nav-item:hover {
+  background-color: #fef2f2;
+  border-color: #b30000;
+}
+
+.sidebar-bottom-nav .nav-item:last-child {
+  margin-bottom: 0;
 }
 
 .teacher-nav-item {
@@ -116,6 +369,7 @@
   padding: 1.5rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   min-height: calc(100vh - 94px);
+  margin-left: 0;
 }
 
 .teacher-section-header {
@@ -241,10 +495,17 @@
     width: 100%;
     position: static;
     margin-bottom: 1rem;
+    height: auto;
+  }
+
+  .sidebar-bottom-nav {
+    margin-top: 1rem;
+    padding-top: 1rem;
   }
 
   .teacher-main-content {
     padding: 1rem;
+    margin-left: 0;
   }
 
   .teacher-card-grid {
@@ -855,5 +1116,149 @@
   .logout-btn {
     flex: 2;
     margin-left: 0.2rem;
+  }
+}
+
+/* Xóa margin-left khỏi dashboard-content và main-content */
+.dashboard-content {
+  margin-left: 0;
+}
+.main-content {
+  margin-left: 0;
+}
+
+/* My Notifications Styles */
+.my-notifications-content {
+  padding: 1rem 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.empty-state p {
+  margin-top: 1rem;
+  font-size: 1.1rem;
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.notification-item {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-left: 4px solid #b30000;
+  transition: all 0.3s ease;
+}
+
+.notification-item:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.notification-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #b30000;
+  margin: 0;
+  flex: 1;
+}
+
+.notification-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.notification-type {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.notification-type.general {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.notification-type.emergency {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.notification-type.schedule {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.notification-type.event {
+  background: #e8f5e8;
+  color: #388e3c;
+}
+
+.notification-date {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.notification-content {
+  margin-bottom: 1rem;
+}
+
+.notification-content p {
+  margin: 0;
+  line-height: 1.6;
+  color: #333;
+}
+
+.notification-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.notification-roles {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .notification-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .notification-meta {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 1rem;
+  }
+  
+  .notification-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 } 

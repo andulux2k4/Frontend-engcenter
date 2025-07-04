@@ -82,8 +82,7 @@ body {
   margin-top: 64px;
   flex: 1;
   max-width: 1200px;
-  margin-left: 100px;
-  margin-right: auto;
+  margin-left: 0;
   width: 100%;
 }
 
@@ -147,7 +146,8 @@ body {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  min-height: calc(100vh - 94px);
+  min-height: 1000px;
+  margin-left: 0;
 }
 
 .section-header {
@@ -361,6 +361,8 @@ body {
 
   .main-content {
     padding: 1rem;
+    min-height: 1000px;
+    margin-left: 0;
   }
 
   .card-grid {

@@ -1,14 +1,115 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import '../Dashboard.css'
 import '../../styles/dashboard/admin.css';
-import { FiUser, FiLogOut, FiEdit, FiTrash2, FiEye, FiUsers, FiPhone, FiMail, FiLock, FiSave, FiX, FiBook, FiCalendar, FiClock, FiMapPin, FiBarChart2, FiFileText, FiCheckCircle, FiPlus } from 'react-icons/fi'
+import { FiUser, FiLogOut, FiEdit, FiTrash2, FiEye, FiUsers, FiPhone, FiMail, FiLock, FiSave, FiX, FiBook, FiCalendar, FiClock, FiMapPin, FiBarChart2, FiFileText, FiCheckCircle, FiPlus, FiHome } from 'react-icons/fi'
+import { MdOutlineApps } from 'react-icons/md';
 import { BiMoney } from 'react-icons/bi'
 import { HiAcademicCap } from 'react-icons/hi'
 import { RiDashboardLine } from 'react-icons/ri'
 import { MdNotifications, MdCampaign, MdPayment } from 'react-icons/md'
 import apiService from '../../services/api'
+import { useNavigate } from 'react-router-dom';
+import ProfileModal from './components/modals/ProfileModal';
+import NotificationModal from './components/modals/NotificationModal';
 
-function AdminDashboard({ user, onLogout }) {
+// Reusable Pagination Component
+const Pagination = ({ 
+  currentPage, 
+  totalPages, 
+  totalItems, 
+  limit, 
+  onPageChange, 
+  loading = false,
+  itemName = 'items'
+}) => {
+  if (totalPages <= 1) return null;
+
+  const startItem = ((currentPage - 1) * limit) + 1;
+  const endItem = Math.min(currentPage * limit, totalItems);
+
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '1rem',
+      backgroundColor: 'white',
+      borderTop: '1px solid #e5e7eb',
+      borderRadius: '0 0 0.5rem 0.5rem',
+      marginTop: '1rem'
+    }}>
+      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+        Hiển thị {startItem} - {endItem} trong tổng số {totalItems} {itemName}
+      </div>
+      
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1 || loading}
+          style={{
+            padding: '0.5rem 0.75rem',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.375rem',
+            backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+            color: currentPage === 1 ? '#9ca3af' : '#374151',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Trước
+        </button>
+
+        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+          const pageNum = i + 1;
+          return (
+            <button
+              key={pageNum}
+              onClick={() => onPageChange(pageNum)}
+              disabled={loading}
+              style={{
+                padding: '0.5rem 0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                backgroundColor: currentPage === pageNum ? '#3b82f6' : 'white',
+                color: currentPage === pageNum ? 'white' : '#374151',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                minWidth: '2.5rem'
+              }}
+            >
+              {pageNum}
+            </button>
+          );
+        })}
+
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || loading}
+          style={{
+            padding: '0.5rem 0.75rem',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.375rem',
+            backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+            color: currentPage === totalPages ? '#9ca3af' : '#374151',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  );
+};
+
+function AdminDashboard({ user, onLogout, onGoHome }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview')
   const [showAddUserForm, setShowAddUserForm] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
@@ -17,7 +118,20 @@ function AdminDashboard({ user, onLogout }) {
   const [showEditClass, setShowEditClass] = useState(false)
   const [selectedClass, setSelectedClass] = useState(null)
   const [editClassData, setEditClassData] = useState(null)
-  // const [showAddStudent, setShowAddStudent] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showNewClassModal, setShowNewClassModal] = useState(false)
+  const [showNotificationModal, setShowNotificationModal] = useState(false)
+  const [users, setUsers] = useState([])
+  const [newClass, setNewClass] = useState({
+    name: '',
+    year: new Date().getFullYear(),
+    grade: '',
+    startDate: '',
+    endDate: '',
+    feePerLesson: '',
+    teacherId: '',
+    daysOfLessonInWeek: []
+  })
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -31,21 +145,613 @@ function AdminDashboard({ user, onLogout }) {
     studentIds: [],
     canViewTeacher: false,
   })
-  const [showNewClassModal, setShowNewClassModal] = useState(false)
-  const [newClass, setNewClass] = useState({
-    name: '',
-    year: new Date().getFullYear(),
-    grade: '',
+  const [tuitionList, setTuitionList] = useState([
+    { id: 1, student: 'Alice Brown', parent: 'Mrs. Brown', class: 'IELTS Advanced', sessions: 20, amount: 5000000, paid: 5000000, date: '2024-03-15', status: 'Đã duyệt', proofImage: '' },
+    { id: 2, student: 'Bob Wilson', parent: 'Mr. Wilson', class: 'TOEIC Preparation', sessions: 18, amount: 5000000, paid: 0, date: '2024-03-14', status: 'Chờ duyệt', proofImage: '' },
+    { id: 3, student: 'Charlie Davis', parent: 'Mr. Davis', class: 'TOEIC Basic', sessions: 15, amount: 4000000, paid: 2000000, date: '2024-03-13', status: 'Chờ duyệt', proofImage: '' },
+    { id: 4, student: 'Diana Evans', parent: 'Mrs. Evans', class: 'IELTS Foundation', sessions: 22, amount: 6000000, paid: 6000000, date: '2024-03-12', status: 'Đã duyệt', proofImage: '' },
+    { id: 5, student: 'Edward Foster', parent: 'Mr. Foster', class: 'Conversation Club', sessions: 16, amount: 3500000, paid: 0, date: '2024-03-11', status: 'Chờ duyệt', proofImage: '' },
+    { id: 6, student: 'Fiona Green', parent: 'Mrs. Green', class: 'Writing Skills', sessions: 19, amount: 4800000, paid: 4800000, date: '2024-03-10', status: 'Đã duyệt', proofImage: '' },
+    { id: 7, student: 'George Harris', parent: 'Mr. Harris', class: 'Reading Comprehension', sessions: 17, amount: 4200000, paid: 2100000, date: '2024-03-09', status: 'Chờ duyệt', proofImage: '' },
+    { id: 8, student: 'Helen Johnson', parent: 'Mrs. Johnson', class: 'Listening Practice', sessions: 21, amount: 5500000, paid: 0, date: '2024-03-08', status: 'Chờ duyệt', proofImage: '' },
+    { id: 9, student: 'Ian King', parent: 'Mr. King', class: 'Speaking Club', sessions: 14, amount: 3800000, paid: 3800000, date: '2024-03-07', status: 'Đã duyệt', proofImage: '' },
+    { id: 10, student: 'Julia Lee', parent: 'Mrs. Lee', class: 'Business English', sessions: 23, amount: 6500000, paid: 3250000, date: '2024-03-06', status: 'Chờ duyệt', proofImage: '' },
+    { id: 11, student: 'Kevin Miller', parent: 'Mr. Miller', class: 'Academic Writing', sessions: 18, amount: 5200000, paid: 0, date: '2024-03-05', status: 'Chờ duyệt', proofImage: '' },
+    { id: 12, student: 'Laura Nelson', parent: 'Mrs. Nelson', class: 'IELTS Advanced', sessions: 20, amount: 5000000, paid: 5000000, date: '2024-03-04', status: 'Đã duyệt', proofImage: '' },
+    { id: 13, student: 'Mark Owens', parent: 'Mr. Owens', class: 'TOEIC Preparation', sessions: 16, amount: 4500000, paid: 2250000, date: '2024-03-03', status: 'Chờ duyệt', proofImage: '' },
+    { id: 14, student: 'Nancy Parker', parent: 'Mrs. Parker', class: 'Grammar Advanced', sessions: 19, amount: 4800000, paid: 0, date: '2024-03-02', status: 'Chờ duyệt', proofImage: '' },
+    { id: 15, student: 'Oliver Quinn', parent: 'Mr. Quinn', class: 'Conversation Club', sessions: 15, amount: 3500000, paid: 3500000, date: '2024-03-01', status: 'Đã duyệt', proofImage: '' }
+  ]);
+  const [salaryList, setSalaryList] = useState([
+    {
+      id: 1,
+      name: 'Sarah Johnson',
+      email: 'sarah@tttenglish.edu.vn',
+      phone: '0912345678',
+      sessions: 18,
+      wage: 350000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 2,
+      name: 'John Smith',
+      email: 'john@tttenglish.edu.vn',
+      phone: '0923456789',
+      sessions: 15,
+      wage: 320000,
+      paidAmount: 4800000,
+      period: '03/2024',
+    },
+    {
+      id: 3,
+      name: 'Mary Wilson',
+      email: 'mary@tttenglish.edu.vn',
+      phone: '0934567890',
+      sessions: 20,
+      wage: 340000,
+      paidAmount: 3400000,
+      period: '03/2024',
+    },
+    {
+      id: 4,
+      name: 'David Brown',
+      email: 'david@tttenglish.edu.vn',
+      phone: '0945678901',
+      sessions: 16,
+      wage: 330000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 5,
+      name: 'Emma Davis',
+      email: 'emma@tttenglish.edu.vn',
+      phone: '0956789012',
+      sessions: 22,
+      wage: 360000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 6,
+      name: 'Michael Johnson',
+      email: 'michael@tttenglish.edu.vn',
+      phone: '0967890123',
+      sessions: 14,
+      wage: 310000,
+      paidAmount: 4340000,
+      period: '03/2024',
+    },
+    {
+      id: 7,
+      name: 'Lisa Anderson',
+      email: 'lisa@tttenglish.edu.vn',
+      phone: '0978901234',
+      sessions: 19,
+      wage: 345000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 8,
+      name: 'Robert Wilson',
+      email: 'robert@tttenglish.edu.vn',
+      phone: '0989012345',
+      sessions: 17,
+      wage: 325000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 9,
+      name: 'Jennifer Lee',
+      email: 'jennifer@tttenglish.edu.vn',
+      phone: '0990123456',
+      sessions: 21,
+      wage: 355000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 10,
+      name: 'Thomas Chen',
+      email: 'thomas@tttenglish.edu.vn',
+      phone: '0901234567',
+      sessions: 13,
+      wage: 300000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 11,
+      name: 'Amanda White',
+      email: 'amanda@tttenglish.edu.vn',
+      phone: '0912345679',
+      sessions: 20,
+      wage: 350000,
+      paidAmount: 0,
+      period: '03/2024',
+    },
+    {
+      id: 12,
+      name: 'Christopher Taylor',
+      email: 'christopher@tttenglish.edu.vn',
+      phone: '0923456780',
+      sessions: 18,
+      wage: 340000,
+      paidAmount: 0,
+      period: '03/2024',
+    }
+  ]);
+  const [availableTeachers, setAvailableTeachers] = useState([])
+  const [availableStudents, setAvailableStudents] = useState([])
+  const [showTeacherSelect, setShowTeacherSelect] = useState(false)
+  const [showStudentSelect, setShowStudentSelect] = useState(false)
+  const [selectedClassForAssignment, setSelectedClassForAssignment] = useState(null)
+  const [parents, setParents] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [allClasses, setAllClasses] = useState([]);
+  const [notifications, setNotifications] = useState([
+    {
+      id: 1,
+      title: 'Lịch học mới cho lớp IELTS Advanced',
+      content: 'Lớp IELTS Advanced sẽ bắt đầu từ 01/04/2024. Vui lòng kiểm tra lịch học chi tiết.',
+      target: 'Học sinh',
+      type: 'event',
+      method: 'Web',
+      date: '20/03/2024',
+    },
+    {
+      id: 2,
+      title: 'Thông báo đóng học phí tháng 3',
+      content: 'Học viên vui lòng hoàn thành học phí tháng 3 trước ngày 25/03/2024.',
+      target: 'Học sinh',
+      type: 'payment reminder',
+      method: 'Email',
+      date: '18/03/2024',
+    },
+    {
+      id: 3,
+      title: 'Khai giảng lớp TOEIC mới',
+      content: 'Lớp TOEIC Preparation sẽ khai giảng vào 15/04/2024. Đăng ký ngay!',
+      target: 'Tất cả',
+      type: 'event',
+      method: 'Both',
+      date: '17/03/2024',
+    },
+    {
+      id: 4,
+      title: 'Thông báo nghỉ lễ 30/4',
+      content: 'Trung tâm sẽ nghỉ lễ từ 30/04 đến 02/05/2024. Các lớp học sẽ tạm dừng trong thời gian này.',
+      target: 'Tất cả',
+      type: 'holiday',
+      method: 'Both',
+      date: '16/03/2024',
+    },
+    {
+      id: 5,
+      title: 'Kết quả thi thử IELTS tháng 3',
+      content: 'Kết quả thi thử IELTS tháng 3 đã có. Vui lòng liên hệ văn phòng để nhận kết quả.',
+      target: 'Học sinh',
+      type: 'result',
+      method: 'Email',
+      date: '15/03/2024',
+    },
+    {
+      id: 6,
+      title: 'Thông báo thay đổi lịch học',
+      content: 'Lớp TOEIC Basic sẽ thay đổi lịch học từ thứ 2,4,6 sang thứ 3,5,7 từ tuần tới.',
+      target: 'Học sinh',
+      type: 'schedule',
+      method: 'Web',
+      date: '14/03/2024',
+    },
+    {
+      id: 7,
+      title: 'Ưu đãi học phí tháng 4',
+      content: 'Giảm 10% học phí cho học viên đăng ký mới trong tháng 4/2024.',
+      target: 'Tất cả',
+      type: 'promotion',
+      method: 'Both',
+      date: '13/03/2024',
+    },
+    {
+      id: 8,
+      title: 'Thông báo bảo trì hệ thống',
+      content: 'Hệ thống quản lý sẽ bảo trì từ 22h00 đến 06h00 ngày mai. Vui lòng thông cảm.',
+      target: 'Tất cả',
+      type: 'maintenance',
+      method: 'Web',
+      date: '12/03/2024',
+    },
+    {
+      id: 9,
+      title: 'Khai giảng lớp Speaking Club',
+      content: 'Lớp Speaking Club mới sẽ khai giảng vào 20/04/2024. Đăng ký ngay để cải thiện kỹ năng nói!',
+      target: 'Học sinh',
+      type: 'event',
+      method: 'Email',
+      date: '11/03/2024',
+    },
+    {
+      id: 10,
+      title: 'Thông báo đóng học phí tháng 4',
+      content: 'Học viên vui lòng hoàn thành học phí tháng 4 trước ngày 25/04/2024.',
+      target: 'Học sinh',
+      type: 'payment reminder',
+      method: 'Email',
+      date: '10/03/2024',
+    },
+    {
+      id: 11,
+      title: 'Workshop Writing Skills',
+      content: 'Workshop Writing Skills sẽ diễn ra vào chủ nhật 28/04/2024. Đăng ký tham gia miễn phí!',
+      target: 'Học sinh',
+      type: 'workshop',
+      method: 'Both',
+      date: '09/03/2024',
+    },
+    {
+      id: 12,
+      title: 'Thông báo nghỉ học cô Sarah',
+      content: 'Cô Sarah sẽ nghỉ học ngày mai (15/03). Lớp IELTS Advanced sẽ được dạy bù vào thứ 7.',
+      target: 'Học sinh',
+      type: 'schedule',
+      method: 'Web',
+      date: '08/03/2024',
+    }
+  ]);
+  const [showAddNotification, setShowAddNotification] = useState(false);
+  const [notificationForm, setNotificationForm] = useState({
+    title: '',
+    content: '',
+    target: '',
+    type: '',
+    method: 'Web',
+  });
+  const [showSalaryModal, setShowSalaryModal] = useState(false);
+  const [salaryModalData, setSalaryModalData] = useState({teacher: null, amount: ''});
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState(null);
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  const [salaryMonth, setSalaryMonth] = useState('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [tuitionStatusFilter, setTuitionStatusFilter] = useState('all');
+  const [tuitionSearch, setTuitionSearch] = useState('');
+  const [showDetailTuitionModal, setShowDetailTuitionModal] = useState(false);
+  const [detailTuitionData, setDetailTuitionData] = useState(null);
+  const [showAddTuitionModal, setShowAddTuitionModal] = useState(false);
+  const [newTuitionData, setNewTuitionData] = useState({student:'',parent:'',class:'',sessions:'',amount:'',paid:'',date:'',status:'Chờ duyệt',proofImage:''});
+  const [advertisements, setAdvertisements] = useState([
+    { 
+      id: 1, 
+      title: 'Khai giảng lớp IELTS Advanced', 
+      content: 'Lớp IELTS Advanced mới sẽ khai giảng vào tháng 4/2024. Đăng ký ngay để nhận ưu đãi 20% học phí!',
+      startDate: '2024-03-01',
+      endDate: '2024-04-30',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=IELTS+Advanced']
+    },
+    { 
+      id: 2, 
+      title: 'Ưu đãi học phí tháng 3', 
+      content: 'Giảm 15% học phí cho tất cả các khóa học trong tháng 3/2024. Áp dụng cho học viên mới.',
+      startDate: '2024-03-01',
+      endDate: '2024-03-31',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Discount+March']
+    },
+    { 
+      id: 3, 
+      title: 'Lớp TOEIC cơ bản', 
+      content: 'Lớp TOEIC cơ bản dành cho người mới bắt đầu. Cam kết đạt 500+ điểm sau 3 tháng.',
+      startDate: '2024-02-15',
+      endDate: '2024-03-15',
+      status: 'Đã ngừng',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=TOEIC+Basic']
+    },
+    { 
+      id: 4, 
+      title: 'Workshop Speaking Skills', 
+      content: 'Workshop Speaking Skills miễn phí dành cho tất cả học viên. Tham gia để cải thiện kỹ năng nói!',
+      startDate: '2024-03-15',
+      endDate: '2024-04-15',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Speaking+Workshop']
+    },
+    { 
+      id: 5, 
+      title: 'Khóa học Business English', 
+      content: 'Khóa học Business English dành cho người đi làm. Học tiếng Anh thương mại hiệu quả.',
+      startDate: '2024-03-10',
+      endDate: '2024-05-10',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Business+English']
+    },
+    { 
+      id: 6, 
+      title: 'Lớp Grammar Advanced', 
+      content: 'Lớp Grammar Advanced giúp học viên nắm vững ngữ pháp tiếng Anh nâng cao.',
+      startDate: '2024-02-20',
+      endDate: '2024-04-20',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Grammar+Advanced']
+    },
+    { 
+      id: 7, 
+      title: 'Khóa học Writing Skills', 
+      content: 'Khóa học Writing Skills giúp học viên viết tiếng Anh chuyên nghiệp và hiệu quả.',
+      startDate: '2024-03-05',
+      endDate: '2024-05-05',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Writing+Skills']
+    },
+    { 
+      id: 8, 
+      title: 'Lớp Reading Comprehension', 
+      content: 'Lớp Reading Comprehension giúp học viên đọc hiểu tiếng Anh nhanh và chính xác.',
+      startDate: '2024-03-12',
+      endDate: '2024-05-12',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Reading+Skills']
+    },
+    { 
+      id: 9, 
+      title: 'Khóa học Listening Practice', 
+      content: 'Khóa học Listening Practice giúp học viên luyện nghe tiếng Anh hiệu quả.',
+      startDate: '2024-03-08',
+      endDate: '2024-05-08',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Listening+Practice']
+    },
+    { 
+      id: 10, 
+      title: 'Lớp Conversation Club', 
+      content: 'Lớp Conversation Club giúp học viên thực hành giao tiếp tiếng Anh tự nhiên.',
+      startDate: '2024-03-20',
+      endDate: '2024-05-20',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Conversation+Club']
+    },
+    { 
+      id: 11, 
+      title: 'Khóa học Academic Writing', 
+      content: 'Khóa học Academic Writing dành cho học viên muốn viết luận văn tiếng Anh.',
+      startDate: '2024-03-25',
+      endDate: '2024-05-25',
+      status: 'Hoạt động',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=Academic+Writing']
+    },
+    { 
+      id: 12, 
+      title: 'Lớp TOEIC Advanced', 
+      content: 'Lớp TOEIC Advanced giúp học viên đạt điểm cao trong kỳ thi TOEIC.',
+      startDate: '2024-02-10',
+      endDate: '2024-04-10',
+      status: 'Đã ngừng',
+      images: ['https://via.placeholder.com/300x200/ff0000/ffffff?text=TOEIC+Advanced']
+    }
+  ]);
+  const [showAddAdvertisement, setShowAddAdvertisement] = useState(false);
+  const [showEditAdvertisement, setShowEditAdvertisement] = useState(false);
+  const [editingAdvertisement, setEditingAdvertisement] = useState(null);
+  const [advertisementForm, setAdvertisementForm] = useState({
+    title: '',
+    content: '',
     startDate: '',
     endDate: '',
-    feePerLesson: '',
-    teacherId: '',
-    daysOfLessonInWeek: []
-  })
-
-  // Real data states
-  const [users, setUsers] = useState([])
-  const [classes, setClasses] = useState([])
+    images: []
+  });
+  const [showDetailAdvertisement, setShowDetailAdvertisement] = useState(false);
+  const [detailAdvertisement, setDetailAdvertisement] = useState(null);
+  const [tuitionPagination, setTuitionPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalTuitions: 0,
+    limit: 10
+  });
+  const [salaryPagination, setSalaryPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalSalaries: 0,
+    limit: 10
+  });
+  const [notificationsPagination, setNotificationsPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalNotifications: 0,
+    limit: 10
+  });
+  const [advertisementsPagination, setAdvertisementsPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalAdvertisements: 0,
+    limit: 10
+  });
+  const [classes, setClasses] = useState([
+    {
+      id: 1,
+      className: 'IELTS Advanced',
+      year: 2024,
+      grade: 12,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Sarah Johnson',
+      teacherEmail: 'sarah@tttenglish.edu.vn',
+      currentStudents: 15,
+      maxStudents: 20,
+      feePerLesson: 500000,
+      schedule: { startDate: '2024-01-15', endDate: '2024-06-15', daysOfLessonInWeek: [2, 4, 6] },
+      studentList: []
+    },
+    {
+      id: 2,
+      className: 'TOEIC Preparation',
+      year: 2024,
+      grade: 11,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'John Smith',
+      teacherEmail: 'john@tttenglish.edu.vn',
+      currentStudents: 12,
+      maxStudents: 18,
+      feePerLesson: 450000,
+      schedule: { startDate: '2024-02-01', endDate: '2024-07-01', daysOfLessonInWeek: [3, 5] },
+      studentList: []
+    },
+    {
+      id: 3,
+      className: 'TOEIC Basic',
+      year: 2024,
+      grade: 10,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Mary Wilson',
+      teacherEmail: 'mary@tttenglish.edu.vn',
+      currentStudents: 18,
+      maxStudents: 20,
+      feePerLesson: 400000,
+      schedule: { startDate: '2024-01-20', endDate: '2024-06-20', daysOfLessonInWeek: [2, 4] },
+      studentList: []
+    },
+    {
+      id: 4,
+      className: 'IELTS Foundation',
+      year: 2024,
+      grade: 9,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'David Brown',
+      teacherEmail: 'david@tttenglish.edu.vn',
+      currentStudents: 14,
+      maxStudents: 16,
+      feePerLesson: 380000,
+      schedule: { startDate: '2024-02-10', endDate: '2024-07-10', daysOfLessonInWeek: [3, 6] },
+      studentList: []
+    },
+    {
+      id: 5,
+      className: 'Conversation Club',
+      year: 2024,
+      grade: 8,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Emma Davis',
+      teacherEmail: 'emma@tttenglish.edu.vn',
+      currentStudents: 20,
+      maxStudents: 25,
+      feePerLesson: 300000,
+      schedule: { startDate: '2024-01-25', endDate: '2024-06-25', daysOfLessonInWeek: [5, 7] },
+      studentList: []
+    },
+    {
+      id: 6,
+      className: 'Grammar Advanced',
+      year: 2024,
+      grade: 12,
+      isAvailable: false,
+      status: 'Đã kết thúc',
+      teacherName: 'Michael Johnson',
+      teacherEmail: 'michael@tttenglish.edu.vn',
+      currentStudents: 16,
+      maxStudents: 18,
+      feePerLesson: 420000,
+      schedule: { startDate: '2023-09-01', endDate: '2024-01-15', daysOfLessonInWeek: [2, 4] },
+      studentList: []
+    },
+    {
+      id: 7,
+      className: 'Writing Skills',
+      year: 2024,
+      grade: 11,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Lisa Anderson',
+      teacherEmail: 'lisa@tttenglish.edu.vn',
+      currentStudents: 13,
+      maxStudents: 15,
+      feePerLesson: 480000,
+      schedule: { startDate: '2024-02-15', endDate: '2024-07-15', daysOfLessonInWeek: [3, 5] },
+      studentList: []
+    },
+    {
+      id: 8,
+      className: 'Reading Comprehension',
+      year: 2024,
+      grade: 10,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Robert Wilson',
+      teacherEmail: 'robert@tttenglish.edu.vn',
+      currentStudents: 17,
+      maxStudents: 20,
+      feePerLesson: 350000,
+      schedule: { startDate: '2024-01-30', endDate: '2024-06-30', daysOfLessonInWeek: [2, 6] },
+      studentList: []
+    },
+    {
+      id: 9,
+      className: 'Listening Practice',
+      year: 2024,
+      grade: 9,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Jennifer Lee',
+      teacherEmail: 'jennifer@tttenglish.edu.vn',
+      currentStudents: 19,
+      maxStudents: 22,
+      feePerLesson: 320000,
+      schedule: { startDate: '2024-02-05', endDate: '2024-07-05', daysOfLessonInWeek: [4, 7] },
+      studentList: []
+    },
+    {
+      id: 10,
+      className: 'Speaking Club',
+      year: 2024,
+      grade: 8,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Thomas Chen',
+      teacherEmail: 'thomas@tttenglish.edu.vn',
+      currentStudents: 21,
+      maxStudents: 25,
+      feePerLesson: 280000,
+      schedule: { startDate: '2024-01-10', endDate: '2024-06-10', daysOfLessonInWeek: [5, 6] },
+      studentList: []
+    },
+    {
+      id: 11,
+      className: 'Business English',
+      year: 2024,
+      grade: 12,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Amanda White',
+      teacherEmail: 'amanda@tttenglish.edu.vn',
+      currentStudents: 11,
+      maxStudents: 15,
+      feePerLesson: 550000,
+      schedule: { startDate: '2024-02-20', endDate: '2024-07-20', daysOfLessonInWeek: [2, 5] },
+      studentList: []
+    },
+    {
+      id: 12,
+      className: 'Academic Writing',
+      year: 2024,
+      grade: 11,
+      isAvailable: true,
+      status: 'Đang học',
+      teacherName: 'Christopher Taylor',
+      teacherEmail: 'christopher@tttenglish.edu.vn',
+      currentStudents: 14,
+      maxStudents: 16,
+      feePerLesson: 520000,
+      schedule: { startDate: '2024-01-05', endDate: '2024-06-05', daysOfLessonInWeek: [3, 6] },
+      studentList: []
+    }
+  ]);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [pagination, setPagination] = useState({
@@ -54,18 +760,174 @@ function AdminDashboard({ user, onLogout }) {
     totalUsers: 0,
     limit: 10
   })
+  const [classesPagination, setClassesPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalClasses: 0,
+    limit: 10
+  });
 
-  // New states for available teachers and students
-  const [availableTeachers, setAvailableTeachers] = useState([])
-  const [availableStudents, setAvailableStudents] = useState([])
-  const [showTeacherSelect, setShowTeacherSelect] = useState(false)
-  const [showStudentSelect, setShowStudentSelect] = useState(false)
-  const [selectedClassForAssignment, setSelectedClassForAssignment] = useState(null)
+  const filteredTuitionList = tuitionList.filter(t =>
+    (tuitionStatusFilter === 'all' || t.status === tuitionStatusFilter) &&
+    (t.student.toLowerCase().includes(tuitionSearch.toLowerCase()) || t.class.toLowerCase().includes(tuitionSearch.toLowerCase()))
+  );
+  const totalPaid = tuitionList.reduce((sum, t) => sum + (t.paid || 0), 0);
+  const totalUnpaid = tuitionList.reduce((sum, t) => sum + (t.amount - (t.paid || 0)), 0);
 
-  // States for conditional form fields
-  const [parents, setParents] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [allClasses, setAllClasses] = useState([]);
+  // Pagination calculation functions
+  const getPaginatedData = (data, pagination) => {
+    const startIndex = (pagination.currentPage - 1) * pagination.limit;
+    const endIndex = startIndex + pagination.limit;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const updatePagination = (setPaginationFunc, totalItems, currentPage = 1) => {
+    const totalPages = Math.ceil(totalItems / 10);
+    setPaginationFunc(prev => {
+      // Only update if values actually changed
+      if (prev.totalItems === totalItems && prev.totalPages === Math.max(1, totalPages)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        currentPage,
+        totalPages: Math.max(1, totalPages),
+        totalItems
+      };
+    });
+  };
+
+  // Paginated data
+  const paginatedClasses = getPaginatedData(classes, classesPagination);
+  const paginatedTuitions = getPaginatedData(filteredTuitionList, tuitionPagination);
+  const paginatedNotifications = getPaginatedData(notifications, notificationsPagination);
+  const paginatedAdvertisements = getPaginatedData(advertisements, advertisementsPagination);
+  const paginatedSalaries = getPaginatedData(salaryList, salaryPagination);
+
+  function handleApproveTuition(id) {
+    setTuitionList(list => list.map(t => t.id === id ? { ...t, status: 'Đã duyệt', paid: t.amount } : t));
+  }
+  function handleRejectTuition(id) {
+    if(window.confirm('Bạn có chắc muốn từ chối khoản học phí này?'))
+      setTuitionList(list => list.map(t => t.id === id ? { ...t, status: 'Từ chối' } : t));
+  }
+  function handleAddTuition() {
+    setNewTuitionData({student:'',parent:'',class:'',sessions:'',amount:'',paid:'',date:'',status:'Chờ duyệt',proofImage:''});
+    setShowAddTuitionModal(true);
+  }
+  function handleRowClick(tuition, e) {
+    // Không mở modal khi click vào nút thao tác
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    setDetailTuitionData(tuition);
+    setShowDetailTuitionModal(true);
+  }
+  function handleProofImageChange(e, setter) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = ev => setter(prev => ({...prev, proofImage: ev.target.result}));
+      reader.readAsDataURL(file);
+    }
+  }
+
+  // --- QUẢNG CÁO FUNCTIONS ---
+  function handleAddAdvertisement() {
+    setAdvertisementForm({
+      title: '',
+      content: '',
+      startDate: '',
+      endDate: '',
+      images: []
+    });
+    setShowAddAdvertisement(true);
+  }
+
+  function handleEditAdvertisement(ad) {
+    setEditingAdvertisement(ad);
+    setAdvertisementForm({
+      title: ad.title,
+      content: ad.content,
+      startDate: ad.startDate,
+      endDate: ad.endDate,
+      images: [...ad.images]
+    });
+    setShowEditAdvertisement(true);
+  }
+
+  function handleDeleteAdvertisement(id) {
+    if (window.confirm('Bạn có chắc muốn xóa quảng cáo này?')) {
+      setAdvertisements(list => list.filter(ad => ad.id !== id));
+    }
+  }
+
+  function handleAdvertisementSubmit(e) {
+    e.preventDefault();
+    const newAd = {
+      id: editingAdvertisement ? editingAdvertisement.id : Date.now(),
+      title: advertisementForm.title,
+      content: advertisementForm.content,
+      startDate: advertisementForm.startDate,
+      endDate: advertisementForm.endDate,
+      status: 'Hoạt động',
+      images: advertisementForm.images
+    };
+
+    if (editingAdvertisement) {
+      setAdvertisements(list => list.map(ad => ad.id === editingAdvertisement.id ? newAd : ad));
+      setShowEditAdvertisement(false);
+      setEditingAdvertisement(null);
+    } else {
+      setAdvertisements(list => [newAd, ...list]);
+      setShowAddAdvertisement(false);
+    }
+
+    setAdvertisementForm({
+      title: '',
+      content: '',
+      startDate: '',
+      endDate: '',
+      images: []
+    });
+  }
+
+  function handleImageUpload(e) {
+    const files = Array.from(e.target.files);
+    const newImages = [];
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        newImages.push(ev.target.result);
+        if (newImages.length === files.length) {
+          setAdvertisementForm(prev => ({
+            ...prev,
+            images: [...prev.images, ...newImages]
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function handleRemoveImage(index) {
+    setAdvertisementForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  }
+
+  function handleToggleAdvertisementStatus(id) {
+    setAdvertisements(list => list.map(ad => 
+      ad.id === id ? { ...ad, status: ad.status === 'Hoạt động' ? 'Đã ngừng' : 'Hoạt động' } : ad
+    ));
+  }
+
+  // Đổi tên hàm click quảng cáo để tránh trùng
+  function handleAdRowClick(advertisement, e) {
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    setDetailAdvertisement(advertisement);
+    setShowDetailAdvertisement(true);
+  }
 
   // Load data based on active tab
   useEffect(() => {
@@ -78,6 +940,36 @@ function AdminDashboard({ user, onLogout }) {
       setError('')
     }
   }, [activeTab, pagination.currentPage, selectedRole])
+
+  // Reset pagination to page 1 when switching tabs
+  useEffect(() => {
+    setClassesPagination(prev => ({ ...prev, currentPage: 1 }));
+    setTuitionPagination(prev => ({ ...prev, currentPage: 1 }));
+    setSalaryPagination(prev => ({ ...prev, currentPage: 1 }));
+    setNotificationsPagination(prev => ({ ...prev, currentPage: 1 }));
+    setAdvertisementsPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, [activeTab]);
+
+  // Update pagination when data changes
+  useEffect(() => {
+    updatePagination(setClassesPagination, classes.length, 1);
+  }, [classes.length]);
+
+  useEffect(() => {
+    updatePagination(setTuitionPagination, filteredTuitionList.length, 1);
+  }, [filteredTuitionList.length]);
+
+  useEffect(() => {
+    updatePagination(setNotificationsPagination, notifications.length, 1);
+  }, [notifications.length]);
+
+  useEffect(() => {
+    updatePagination(setAdvertisementsPagination, advertisements.length, 1);
+  }, [advertisements.length]);
+
+  useEffect(() => {
+    updatePagination(setSalaryPagination, salaryList.length, 1);
+  }, [salaryList.length]);
 
   const loadUsers = async () => {
     if (!user?.token) return
@@ -987,8 +1879,13 @@ function AdminDashboard({ user, onLogout }) {
     }));
   };
 
+  const handleGoHome = () => {
+    navigate('/');
+    if (onGoHome) onGoHome();
+  };
+
   return (
-    <div className="dashboard">
+    <div className="dashboard admin-dashboard">
       <header className="dashboard-header">
         <h1>
           <FiUser className="icon" />
@@ -996,10 +1893,6 @@ function AdminDashboard({ user, onLogout }) {
         </h1>
         <div className="user-info">
           <span>Xin chào, {user?.name}</span>
-          <button onClick={onLogout} className="logout-btn">
-            <FiLogOut className="icon" style={{ marginRight: '0.5rem' }} />
-            Đăng xuất
-          </button>
         </div>
       </header>
 
@@ -1027,19 +1920,20 @@ function AdminDashboard({ user, onLogout }) {
               <HiAcademicCap className="icon" />
               Lớp học
             </button>
-            <button
-              className={`nav-item ${activeTab === 'payments' ? 'active' : ''}`}
-              onClick={() => setActiveTab('payments')}
-            >
-              <BiMoney className="icon" />
-              Thanh toán
-            </button>
+        
             <button
               className={`nav-item ${activeTab === 'tuition' ? 'active' : ''}`}
               onClick={() => setActiveTab('tuition')}
             >
               <MdPayment className="icon" />
               Học phí
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'salary' ? 'active' : ''}`}
+              onClick={() => setActiveTab('salary')}
+            >
+              <BiMoney className="icon" />
+              Lương giáo viên
             </button>
             {/* New sidebar items */}
             <button
@@ -1056,8 +1950,32 @@ function AdminDashboard({ user, onLogout }) {
               <MdCampaign className="icon" />
               Quảng cáo
             </button>
-            
           </nav>
+          
+          {/* Navigation menu ở góc dưới sidebar */}
+          <div className="sidebar-bottom-nav">
+          <button 
+              className="nav-item"
+              onClick={() => handleGoHome()}
+            >
+              <FiHome className="icon" />
+              Trang chủ
+            </button>
+            <button 
+              className="nav-item"
+              onClick={() => setShowProfileModal(true)}
+            >
+              <FiUser className="icon" />
+              Hồ sơ
+            </button>
+            <button 
+              className="nav-item"
+              onClick={() => onLogout()}
+            >
+              <FiLogOut className="icon" />
+              Đăng xuất
+            </button>
+          </div>
         </aside>
 
         <main className="main-content">
@@ -1741,12 +2659,17 @@ function AdminDashboard({ user, onLogout }) {
                   overflowX: 'auto',
                   borderRadius: '0.5rem',
                   boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  minHeight: '400px',
+                  height: 'auto',
+                  maxHeight: 'none'
                 }}>
                   <table className="data-table" style={{
                     width: '100%',
                     borderCollapse: 'collapse',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    height: 'auto',
+                    minHeight: '300px'
                   }}>
                   <thead>
                       <tr style={{
@@ -1827,7 +2750,8 @@ function AdminDashboard({ user, onLogout }) {
                             backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
                             borderBottom: '1px solid #f3f4f6',
                             transition: 'background-color 0.2s ease',
-                            minHeight: '80px'
+                            minHeight: '80px',
+                            height: 'auto'
                           }}>
                             <td style={{
                               padding: '1.25rem 1rem',
@@ -2041,83 +2965,13 @@ function AdminDashboard({ user, onLogout }) {
 
               {/* Pagination Controls */}
               {!loading && filteredUsers.length > 0 && pagination.totalPages > 1 && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '1.5rem',
-                  padding: '1rem',
-                  backgroundColor: 'white',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    Hiển thị {((pagination.currentPage - 1) * pagination.limit) + 1} - {Math.min(pagination.currentPage * pagination.limit, pagination.totalUsers)} trong tổng số {pagination.totalUsers} người dùng
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-                      disabled={pagination.currentPage === 1 || loading}
-                      style={{
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        backgroundColor: pagination.currentPage === 1 ? '#f3f4f6' : 'white',
-                        color: pagination.currentPage === 1 ? '#9ca3af' : '#374151',
-                        cursor: pagination.currentPage === 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Trước
-                    </button>
-                    
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
-                            disabled={loading}
-                            style={{
-                              padding: '0.5rem 0.75rem',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '0.375rem',
-                              backgroundColor: pagination.currentPage === pageNum ? '#3b82f6' : 'white',
-                              color: pagination.currentPage === pageNum ? 'white' : '#374151',
-                              cursor: loading ? 'not-allowed' : 'pointer',
-                              fontSize: '0.875rem',
-                              transition: 'all 0.2s ease',
-                              minWidth: '2.5rem'
-                            }}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
-                      disabled={pagination.currentPage === pagination.totalPages || loading}
-                      style={{
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        backgroundColor: pagination.currentPage === pagination.totalPages ? '#f3f4f6' : 'white',
-                        color: pagination.currentPage === pagination.totalPages ? '#9ca3af' : '#374151',
-                        cursor: pagination.currentPage === pagination.totalPages ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Sau
-                    </button>
-                  </div>
-                </div>
+                <Pagination 
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.totalUsers}
+                  limit={pagination.limit}
+                  onPageChange={setPagination}
+                />
               )}
             </section>
           )}
@@ -2222,7 +3076,7 @@ function AdminDashboard({ user, onLogout }) {
                       </p>
                     </div>
                   ) : (
-                    classes.map(classItem => (
+                    paginatedClasses.map(classItem => (
                       <div key={classItem.id} className="card" style={{
                         backgroundColor: 'white',
                         borderRadius: '0.75rem',
@@ -2461,6 +3315,19 @@ function AdminDashboard({ user, onLogout }) {
                     ))
                   )}
                 </div>
+              )}
+
+              {/* Pagination for Classes */}
+              {!loading && classes.length > 0 && classesPagination.totalPages > 1 && (
+                <Pagination 
+                  currentPage={classesPagination.currentPage}
+                  totalPages={classesPagination.totalPages}
+                  totalItems={classesPagination.totalClasses}
+                  limit={classesPagination.limit}
+                  onPageChange={(newPage) => setClassesPagination(prev => ({ ...prev, currentPage: newPage }))}
+                  loading={loading}
+                  itemName="lớp học"
+                />
               )}
 
               {showClassDetail && selectedClass && (
@@ -3135,41 +4002,468 @@ function AdminDashboard({ user, onLogout }) {
             </section>
           )}
 
-          {activeTab === 'payments' && (
+        
+          {activeTab === 'tuition' && (
             <section>
-              <div className="section-header">
+              <div className="section-header" style={{justifyContent:'space-between',alignItems:'center',gap:'1rem'}}>
                 <h2 className="section-title">
-                  <i className="fas fa-money-bill-wave"></i>
-                  Quản lý thanh toán
+                  <MdPayment className="icon" />
+                  Quản lý Học phí
                 </h2>
+                <button className="btn btn-primary" style={{background:'#b30000'}} onClick={handleAddTuition}>Thêm khoản học phí</button>
               </div>
-              <table className="data-table payment-table">
+              {/* Bộ lọc và tìm kiếm */}
+              <div style={{display:'flex',gap:'1.5rem',alignItems:'center',marginBottom:'1.5rem',background:'#fff',padding:'1rem 1.5rem',borderRadius:10,boxShadow:'0 1px 3px #0001',border:'1px solid #eee'}}>
+                <div>
+                  <label style={{fontWeight:600,color:'#b30000',marginRight:8}}>Trạng thái:</label>
+                  <select value={tuitionStatusFilter} onChange={e=>setTuitionStatusFilter(e.target.value)} style={{padding:'0.4rem 1.2rem',borderRadius:6,border:'1px solid #ddd'}}>
+                    <option value="all">Tất cả</option>
+                    <option value="Chờ duyệt">Chờ duyệt</option>
+                    <option value="Đã duyệt">Đã duyệt</option>
+                    <option value="Từ chối">Từ chối</option>
+                  </select>
+                </div>
+                <div style={{flex:1}}>
+                  <input type="text" placeholder="Tìm kiếm học viên..." value={tuitionSearch} onChange={e=>setTuitionSearch(e.target.value)} style={{width:'100%',padding:'0.4rem 1.2rem',borderRadius:6,border:'1px solid #ddd'}}/>
+                </div>
+                <div style={{fontWeight:600,color:'#b30000',fontSize:'1.1rem'}}>
+                  Tổng thu: {totalPaid.toLocaleString()} VNĐ
+                </div>
+                <div style={{fontWeight:600,color:'#92400e',fontSize:'1.1rem'}}>
+                  Chưa thu: {totalUnpaid.toLocaleString()} VNĐ
+                </div>
+              </div>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Học viên</th>
+                      <th>Lớp</th>
+                      <th>Số buổi</th>
+                      <th>Tổng tiền</th>
+                      <th>Đã đóng</th>
+                      <th style={{width: '10%'}}>Ngày</th>
+                      <th style={{width: '15%'}}>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTuitionList.length === 0 ? (
+                      <tr><td colSpan="8" style={{textAlign:'center',padding:'2rem',color:'#b30000'}}>Không có dữ liệu</td></tr>
+                    ) : paginatedTuitions.map(tuition => (
+                      <tr key={tuition.id} style={{cursor:'pointer'}} onClick={e=>handleRowClick(tuition, e)}>
+                        <td>{tuition.student}</td>
+                        <td>{tuition.class}</td>
+                        <td style={{textAlign:'center'}}>{tuition.sessions}</td>
+                        <td style={{color:'#b30000',fontWeight:600}}>{tuition.amount?.toLocaleString()} VNĐ</td>
+                        <td style={{color:'#166534',fontWeight:600}}>{(tuition.paid||0).toLocaleString()} VNĐ</td>
+                        <td>{tuition.date}</td>
+                        <td>
+                          <span className={`status-badge ${tuition.status === 'Đã duyệt' ? 'success' : tuition.status === 'Từ chối' ? 'danger' : 'warning'}`}
+                            style={{
+                              backgroundColor: tuition.status === 'Đã duyệt' ? '#dcfce7' : tuition.status === 'Từ chối' ? '#ffeaea' : '#fef3c7',
+                              color: tuition.status === 'Đã duyệt' ? '#166534' : tuition.status === 'Từ chối' ? '#b30000' : '#92400e',
+                              border: tuition.status === 'Đã duyệt' ? '1px solid #16a34a' : tuition.status === 'Từ chối' ? '1px solid #b30000' : '1px solid #f59e42',
+                              fontWeight: 600
+                            }}
+                          >
+                            {tuition.status}
+                          </span>
+                        </td>
+                        <td style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                          {tuition.status === 'Chờ duyệt' && (
+                            <button className="btn btn-primary" style={{background:'#b30000',color:'#fff',borderRadius:8,fontWeight:600}}
+                              onClick={e=>{e.stopPropagation();handleApproveTuition(tuition.id);}}
+                            >Phê duyệt</button>
+                          )}
+                          {tuition.status === 'Chờ duyệt' && (
+                            <button className="btn btn-danger" style={{background:'#ffeaea',color:'#b30000',border:'1px solid #b30000',borderRadius:8,fontWeight:600}}
+                              onClick={e=>{e.stopPropagation();handleRejectTuition(tuition.id);}}
+                            >Từ chối</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination for Tuitions */}
+              {!loading && filteredTuitionList.length > 0 && tuitionPagination.totalPages > 1 && (
+                <Pagination 
+                  currentPage={tuitionPagination.currentPage}
+                  totalPages={tuitionPagination.totalPages}
+                  totalItems={tuitionPagination.totalTuitions}
+                  limit={tuitionPagination.limit}
+                  onPageChange={(newPage) => setTuitionPagination(prev => ({ ...prev, currentPage: newPage }))}
+                  loading={loading}
+                  itemName="khoản học phí"
+                />
+              )}
+
+              {/* Modal chi tiết học phí */}
+              {showDetailTuitionModal && detailTuitionData && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:420}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem'}}>Chi tiết khoản học phí</h3>
+                    <table style={{width:'100%',borderCollapse:'separate',borderSpacing:0,background:'#fff5f5',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 8px #b3000022',marginBottom:'1.2rem'}}>
+                      <tbody>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Tên học viên</td><td style={{padding:'0.7rem',textAlign:'right'}}>{detailTuitionData.student}</td></tr>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Tên phụ huynh</td><td style={{padding:'0.7rem',textAlign:'right'}}>{detailTuitionData.parent}</td></tr>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Tên lớp</td><td style={{padding:'0.7rem',textAlign:'right'}}>{detailTuitionData.class}</td></tr>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Số buổi học</td><td style={{padding:'0.7rem',textAlign:'right'}}>{detailTuitionData.sessions}</td></tr>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Tổng số tiền</td><td style={{padding:'0.7rem',textAlign:'right'}}>{detailTuitionData.amount?.toLocaleString()} VNĐ</td></tr>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Tiền đã đóng</td><td style={{padding:'0.7rem',textAlign:'right'}}>{(detailTuitionData.paid||0).toLocaleString()} VNĐ</td></tr>
+                        <tr><td style={{fontWeight:600,color:'#b30000',padding:'0.7rem'}}>Ảnh minh chứng</td><td style={{padding:'0.7rem',textAlign:'right'}}>{detailTuitionData.proofImage ? <img src={detailTuitionData.proofImage} alt="minh chứng" style={{maxWidth:120,maxHeight:80,borderRadius:8}}/> : <span style={{color:'#888'}}>Chưa có</span>}</td></tr>
+                      </tbody>
+                    </table>
+                    <div className="form-actions" style={{display:'flex',justifyContent:'flex-end',gap:'1rem'}}>
+                      <button className="btn btn-secondary" onClick={()=>setShowDetailTuitionModal(false)}>Đóng</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Modal thêm học phí */}
+              {showAddTuitionModal && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:400}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem'}}>Thêm khoản học phí</h3>
+                    <form onSubmit={e=>{
+                      e.preventDefault();
+                      setTuitionList(list => [
+                        {...newTuitionData, id: Date.now(), amount: Number(newTuitionData.amount), paid: Number(newTuitionData.paid)||0},
+                        ...list
+                      ]);
+                      setShowAddTuitionModal(false);
+                    }}>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Học viên</label>
+                        <input type="text" required value={newTuitionData.student} onChange={e=>setNewTuitionData(d=>({...d,student:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Phụ huynh</label>
+                        <input type="text" required value={newTuitionData.parent} onChange={e=>setNewTuitionData(d=>({...d,parent:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Lớp</label>
+                        <input type="text" required value={newTuitionData.class} onChange={e=>setNewTuitionData(d=>({...d,class:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Số buổi</label>
+                        <input type="number" min={0} required value={newTuitionData.sessions} onChange={e=>setNewTuitionData(d=>({...d,sessions:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Tổng tiền</label>
+                        <input type="number" min={0} required value={newTuitionData.amount} onChange={e=>setNewTuitionData(d=>({...d,amount:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Đã đóng</label>
+                        <input type="number" min={0} value={newTuitionData.paid} onChange={e=>setNewTuitionData(d=>({...d,paid:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Ngày</label>
+                        <input type="date" required value={newTuitionData.date} onChange={e=>setNewTuitionData(d=>({...d,date:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Ảnh minh chứng</label>
+                        <input type="file" accept="image/*" onChange={e=>handleProofImageChange(e, setNewTuitionData)} style={{flex:1,minWidth:0}}/>
+                        {newTuitionData.proofImage && <img src={newTuitionData.proofImage} alt="minh chứng" style={{maxWidth:60,maxHeight:40,marginLeft:8,borderRadius:6}}/>}
+                      </div>
+                      <div className="form-actions" style={{display:'flex',justifyContent:'flex-end',gap:'1rem'}}>
+                        <button type="button" className="btn btn-secondary" onClick={()=>setShowAddTuitionModal(false)}>Hủy</button>
+                        <button type="submit" className="btn btn-primary" style={{background:'#b30000'}}>Thêm</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+          {activeTab === 'salary' && (
+            <section className="salary-section">
+              <div className="section-header" style={{justifyContent:'space-between',alignItems:'center',gap:'1rem'}}>
+                <h2 className="section-title">
+                  <BiMoney className="icon" />
+                  Thanh toán lương giáo viên
+                </h2>
+                <button className="btn btn-primary" style={{background:'#b30000'}} onClick={()=>setShowMonthModal(true)}>Tính lương</button>
+              </div>
+              <div className="table-container">
+                <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Học viên</th>
-                    <th>Khóa học</th>
-                    <th>Số tiền</th>
-                    <th>Ngày</th>
+                    <th>Họ và tên</th>
+                    <th>Số buổi dạy</th>
+                    <th>Lương/buổi</th>
+                    <th><b>Tổng lương</b></th>
+                    <th><b>Thời gian</b></th>
                     <th>Trạng thái</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockData.payments.map(payment => (
-                    <tr key={payment.id}>
-                      <td>{payment.student}</td>
-                      <td>{payment.course}</td>
-                      <td>{payment.amount} VNĐ</td>
-                      <td>{payment.date}</td>
-                      <td>
-                        <span className={`status-badge ${payment.status === 'Đã thanh toán' ? 'success' : 'warning'}`}>
-                          <i className="fas fa-circle"></i>
-                          {payment.status}
+                  {paginatedSalaries.map(teacher => {
+                    const total = teacher.sessions * teacher.wage;
+                    let status = 'Chưa trả';
+                    if (teacher.paidAmount >= total) status = 'Trả hết';
+                    else if (teacher.paidAmount > 0) status = 'Còn thiếu';
+                    return (
+                      <tr key={teacher.id} style={{cursor:'pointer'}} onClick={e=>{
+                        // Đừng mở modal khi click vào nút thao tác
+                        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                        setDetailData(teacher);
+                        setShowDetailModal(true);
+                      }}>
+                        <td style={{fontWeight:600,color:'#b30000'}}>{teacher.name}</td>
+                        <td style={{textAlign:'center'}}>{teacher.sessions}</td>
+                        <td style={{color:'#b30000',fontWeight:500}}>{teacher.wage.toLocaleString()} VNĐ</td>
+                        <td style={{color:'#b30000',fontWeight:500}}>{total.toLocaleString()} VNĐ</td>
+                        <td style={{color:'#374151',fontWeight:500}}>{teacher.period || ''}</td>
+                        <td>
+                          <span className={`status-badge ${status === 'Trả hết' ? 'success' : status === 'Còn thiếu' ? 'warning' : ''}`}
+                            style={{
+                              backgroundColor: status === 'Trả hết' ? '#dcfce7' : status === 'Còn thiếu' ? '#fef3c7' : '#ffeaea',
+                              color: status === 'Trả hết' ? '#166534' : status === 'Còn thiếu' ? '#92400e' : '#b30000',
+                              border: status === 'Trả hết' ? '1px solid #16a34a' : status === 'Còn thiếu' ? '1px solid #f59e42' : '1px solid #b30000',
+                              fontWeight: 600
+                            }}
+                          >
+                            {status}
                         </span>
                       </td>
-                    </tr>
-                  ))}
+                        <td style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                          {status === 'Trả hết' ? (
+                            <button className="btn btn-secondary" style={{background:'#f3f4f6',color:'#b30000',border:'1px solid #b30000',borderRadius:8,fontWeight:600,cursor:'not-allowed',opacity:0.7}} disabled>Đã trả hết</button>
+                          ) : (
+                            <button className="btn btn-primary" style={{background:'#b30000',color:'#fff',borderRadius:8,fontWeight:600}}
+                              onClick={e=>{
+                                e.stopPropagation();
+                                setShowSalaryModal(true);
+                                setSalaryModalData({teacher, amount: total - teacher.paidAmount});
+                              }}
+                            >
+                              Thanh toán
+                            </button>
+                          )}
+                          <button className="btn btn-secondary" style={{background:'#fff',color:'#b30000',border:'1px solid #b30000',borderRadius:8,fontWeight:600}}
+                            onClick={e=>{
+                              e.stopPropagation();
+                              setEditData({...teacher});
+                              setShowEditModal(true);
+                            }}
+                          >Sửa</button>
+                          <button className="btn btn-danger" style={{background:'#ffeaea',color:'#b30000',border:'1px solid #b30000',borderRadius:8,fontWeight:600}}
+                            onClick={e=>{
+                              e.stopPropagation();
+                              if(window.confirm('Bạn có chắc muốn xóa giáo viên này khỏi bảng lương?'))
+                                setSalaryList(list=>list.filter(t=>t.id!==teacher.id));
+                            }}
+                          >Xóa</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
+              </div>
+
+              {/* Pagination for Salaries */}
+              {!loading && salaryList.length > 0 && salaryPagination.totalPages > 1 && (
+                <Pagination 
+                  currentPage={salaryPagination.currentPage}
+                  totalPages={salaryPagination.totalPages}
+                  totalItems={salaryPagination.totalSalaries}
+                  limit={salaryPagination.limit}
+                  onPageChange={(newPage) => setSalaryPagination(prev => ({ ...prev, currentPage: newPage }))}
+                  loading={loading}
+                  itemName="giáo viên"
+                />
+              )}
+
+              {/* Modal chi tiết giáo viên */}
+              {showDetailModal && detailData && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:420}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem',display:'flex',alignItems:'center',gap:8}}>
+                      <BiMoney style={{fontSize:'1.5rem'}}/> Chi tiết lương giáo viên
+                    </h3>
+                    <table style={{width:'100%',borderCollapse:'separate',borderSpacing:0,background:'#fff5f5',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 8px #b3000022',marginBottom:'1.2rem'}}>
+                      <tbody>
+                        <tr>
+                          <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',width:'40%',borderBottom:'1px solid #ffeaea'}}>Họ tên</td>
+                        <td style={{padding:'0.7rem 0.7rem',textAlign:'right',fontWeight:500}}>{detailData.name}</td>
+                      </tr>
+                      <tr>
+                        <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Email</td>
+                        <td style={{padding:'0.7rem 0.7rem',textAlign:'right'}}>{detailData.email}</td>
+                      </tr>
+                      <tr>
+                        <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Số điện thoại</td>
+                      <td style={{padding:'0.7rem 0.7rem',textAlign:'right'}}>{detailData.phone}</td>
+                    </tr>
+                    <tr>
+                      <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Số buổi dạy</td>
+                    <td style={{padding:'0.7rem 0.7rem',textAlign:'right'}}>{detailData.sessions}</td>
+                  </tr>
+                  <tr>
+                    <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Lương/buổi</td>
+                  <td style={{padding:'0.7rem 0.7rem',textAlign:'right',color:'#b30000',fontWeight:600}}>{detailData.wage?.toLocaleString()} VNĐ</td>
+                </tr>
+                <tr>
+                  <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Tổng lương</td>
+                <td style={{padding:'0.7rem 0.7rem',textAlign:'right',color:'#b30000',fontWeight:700}}>{(detailData.sessions*detailData.wage)?.toLocaleString()} VNĐ</td>
+              </tr>
+              <tr>
+                <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Đã trả</td>
+              <td style={{padding:'0.7rem 0.7rem',textAlign:'right',color:'#166534',fontWeight:600}}>{detailData.paidAmount?.toLocaleString()} VNĐ</td>
+            </tr>
+            <tr>
+              <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Thời gian</td>
+            <td style={{padding:'0.7rem 0.7rem',textAlign:'right'}}>{detailData.period || ''}</td>
+          </tr>
+          <tr>
+            <td style={{padding:'0.7rem 0.7rem',fontWeight:600,color:'#b30000'}}>Trạng thái</td>
+          <td style={{padding:'0.7rem 0.7rem',textAlign:'right',fontWeight:700,color: detailData.paidAmount >= detailData.sessions*detailData.wage ? '#166534' : detailData.paidAmount > 0 ? '#92400e' : '#b30000'}}>
+            {detailData.paidAmount >= detailData.sessions*detailData.wage ? 'Trả hết' : detailData.paidAmount > 0 ? 'Còn thiếu' : 'Chưa trả'}
+          </td>
+        </tr>
+                      </tbody>
+                    </table>
+                    <div className="form-actions" style={{
+                      display: 'flex',
+                      gap: '0.7rem',
+                      justifyContent: 'center',
+                      marginTop: '0',
+                      marginRight: '0',
+                      marginLeft: '0',
+                      marginBottom: '0',
+                      padding: '0 0.5rem 0.5rem 0.5rem',
+                      width: '100%',
+                    }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{
+                          background: '#fff',
+                          color: '#b30000',
+                          border: '1px solid #b30000',
+                          minWidth: 90,
+                          fontWeight: 600,
+                          borderRadius: 8,
+                          padding: '0.5rem 1.2rem'
+                        }}
+                        onClick={() => {
+                          setEditData({ ...detailData });
+                          setShowEditModal(true);
+                          setShowDetailModal(false);
+                        }}
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{
+                          minWidth: 90,
+                          fontWeight: 600,
+                          borderRadius: 8,
+                          padding: '0.5rem 1.2rem'
+                        }}
+                        onClick={() => setShowDetailModal(false)}
+                      >
+                        Đóng
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Modal tính lương theo tháng */}
+              {showMonthModal && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:350}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem'}}>Tính lương theo tháng</h3>
+                    <form onSubmit={e=>{
+                      e.preventDefault();
+                      setSalaryList(list => list.map(t => ({
+                        ...t,
+                        period: salaryMonth ? salaryMonth.split('-').reverse().join('/') : t.period
+                      })));
+                      setShowMonthModal(false);
+                    }}>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Tháng</label>
+                        <input type="month" required value={salaryMonth} onChange={e=>setSalaryMonth(e.target.value)} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-actions" style={{display:'flex',justifyContent:'flex-end',gap:'1rem'}}>
+                        <button type="button" className="btn btn-secondary" onClick={()=>setShowMonthModal(false)}>Hủy</button>
+                        <button type="submit" className="btn btn-primary" style={{background:'#b30000'}}>Tính lương</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              {/* Modal thanh toán lương */}
+              {showSalaryModal && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:400}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem'}}>Thanh toán lương cho giáo viên</h3>
+                    <div style={{marginBottom:'1.1rem',fontWeight:600}}>
+                      Giáo viên: <span style={{color:'#b30000'}}>{salaryModalData.teacher?.name}</span>
+                    </div>
+                    <form onSubmit={e=>{
+                      e.preventDefault();
+                      setSalaryList(list => list.map(t => t.id === salaryModalData.teacher.id ? {...t, paidAmount: t.paidAmount + Number(salaryModalData.amount)} : t));
+                      alert(`Đã thanh toán ${Number(salaryModalData.amount).toLocaleString()} VNĐ cho ${salaryModalData.teacher?.name}`);
+                      setShowSalaryModal(false);
+                    }}>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Số tiền</label>
+                        <input type="number" min={0} required value={salaryModalData.amount} onChange={e=>setSalaryModalData(d=>({...d,amount:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-actions" style={{display:'flex',justifyContent:'flex-end',gap:'1rem'}}>
+                        <button type="button" className="btn btn-secondary" onClick={()=>setShowSalaryModal(false)}>Hủy</button>
+                        <button type="submit" className="btn btn-primary" style={{background:'#b30000'}}>Xác nhận</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              {/* Modal sửa thông tin giáo viên */}
+              {showEditModal && editData && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:400}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem'}}>Sửa thông tin thanh toán</h3>
+                    <form onSubmit={e=>{
+                      e.preventDefault();
+                      setSalaryList(list => list.map(t => t.id === editData.id ? {...t, ...editData} : t));
+                      setShowEditModal(false);
+                    }}>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Tên</label>
+                        <input type="text" required value={editData.name} onChange={e=>setEditData(d=>({...d,name:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Email</label>
+                        <input type="email" required value={editData.email} onChange={e=>setEditData(d=>({...d,email:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Số điện thoại</label>
+                        <input type="text" required value={editData.phone} onChange={e=>setEditData(d=>({...d,phone:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Số buổi</label>
+                        <input type="number" min={0} required value={editData.sessions} onChange={e=>setEditData(d=>({...d,sessions:Number(e.target.value)}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Lương/buổi</label>
+                        <input type="number" min={0} required value={editData.wage} onChange={e=>setEditData(d=>({...d,wage:Number(e.target.value)}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-actions" style={{display:'flex',justifyContent:'center',gap:'1rem'}}>
+                        <button type="button" className="btn btn-secondary" onClick={()=>setShowEditModal(false)}>Hủy</button>
+                        <button type="submit" className="btn btn-primary" style={{background:'#b30000'}}>Lưu</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </section>
           )}
           {activeTab === 'notifications' && (
@@ -3179,99 +4473,432 @@ function AdminDashboard({ user, onLogout }) {
                   <MdNotifications className="icon" />
                   Quản lý Thông báo
                 </h2>
+                <div className="section-actions">
+                  <button className="btn btn-primary" style={{background:'#b30000'}} onClick={()=>setShowAddNotification(true)}>
+                    <FiPlus className="icon" /> Thêm Thông báo
+                  </button>
               </div>
-              <div style={{padding: '2rem', textAlign: 'center', color: '#b30000', fontWeight: 500}}>
-                Chức năng quản lý thông báo sẽ được phát triển tại đây.
               </div>
+              {/* Modal Thêm Thông báo */}
+              {showAddNotification && (
+                <div className="modal">
+                  <div className="modal-content">
+                    <h3 style={{color:'#b30000'}}><FiPlus className="icon"/>Thêm Thông báo mới</h3>
+                    <form onSubmit={e=>{
+                      e.preventDefault();
+                      setNotifications(prev=>[
+                        {
+                          id: Date.now(),
+                          title: notificationForm.title,
+                          content: notificationForm.content,
+                          target: notificationForm.target,
+                          type: notificationForm.type,
+                          method: notificationForm.method,
+                          date: new Date().toLocaleDateString('vi-VN'),
+                        },
+                        ...prev
+                      ]);
+                      setShowAddNotification(false);
+                      setNotificationForm({title:'',content:'',target:'',type:'',method:'Web'});
+                    }}>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Tiêu đề</label>
+                        <input type="text" required value={notificationForm.title} onChange={e=>setNotificationForm(f=>({...f,title:e.target.value}))} style={{flex:1,minWidth:0}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'flex-start',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:90,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap',marginTop:'0.3rem'}}>Nội dung</label>
+                        <textarea required value={notificationForm.content} onChange={e=>setNotificationForm(f=>({...f,content:e.target.value}))} style={{flex:1,minWidth:0,minHeight:80}}/>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:110,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Đối tượng nhận</label>
+                        <select required value={notificationForm.target} onChange={e=>setNotificationForm(f=>({...f,target:e.target.value}))} style={{flex:1,minWidth:0}}>
+                          <option value="">Chọn đối tượng</option>
+                          <option value="Học sinh">Học sinh</option>
+                          <option value="Phụ huynh">Phụ huynh</option>
+                          <option value="Giáo viên">Giáo viên</option>
+                          <option value="Tất cả">Tất cả</option>
+                        </select>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:110,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Loại thông báo</label>
+                        <select required value={notificationForm.type} onChange={e=>setNotificationForm(f=>({...f,type:e.target.value}))} style={{flex:1,minWidth:0}}>
+                          <option value="">Chọn loại</option>
+                          <option value="general">General</option>
+                          <option value="event">Event</option>
+                          <option value="payment reminder">Payment Reminder</option>
+                          <option value="class absence">Class Absence</option>
+                        </select>
+                      </div>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:110,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Phương thức gửi</label>
+                        <div className="radio-group radio-group-horizontal" style={{flex:1,minWidth:0}}>
+                          <label><input type="radio" name="method" value="Web" checked={notificationForm.method==='Web'} onChange={e=>setNotificationForm(f=>({...f,method:e.target.value}))}/>Web</label>
+                          <label><input type="radio" name="method" value="Email" checked={notificationForm.method==='Email'} onChange={e=>setNotificationForm(f=>({...f,method:e.target.value}))}/>Email</label>
+                          <label><input type="radio" name="method" value="Both" checked={notificationForm.method==='Both'} onChange={e=>setNotificationForm(f=>({...f,method:e.target.value}))}/>Cả hai</label>
+                        </div>
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" className="btn btn-primary" style={{background:'#b30000'}}>Gửi thông báo</button>
+                        <button type="button" className="btn btn-secondary" onClick={()=>setShowAddNotification(false)}>Hủy</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              {/* Danh sách thông báo */}
+              <div className="card-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '1.5rem',
+                marginTop: '0.5rem',
+                alignItems: 'stretch',
+                justifyItems: 'center',
+              }}>
+                {notifications.length === 0 ? (
+                  <div style={{textAlign:'center',color:'#b30000',padding:'2rem'}}>Chưa có thông báo nào.</div>
+                ) : paginatedNotifications.map(noti => (
+                  <div key={noti.id} className="card notifications-card" style={{border:'1.5px solid #b30000', background:'#fff5f5', borderRadius:'1.1rem', position:'relative', boxShadow:'0 2px 12px rgba(179,0,0,0.07)', padding:'1.5rem 1.2rem 1.2rem 1.2rem', margin:'0 auto', maxWidth:440, minWidth:260, display:'flex', flexDirection:'column', gap:'0.7rem', transition:'box-shadow 0.2s, transform 0.2s'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'0.7rem', marginBottom:'0.2rem'}}>
+                      <div style={{background:'#b30000',color:'#fff',borderRadius:'50%',width:38,height:38,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',boxShadow:'0 2px 8px #b3000022'}}>
+                        <MdNotifications/>
+                      </div>
+                      <h4 style={{color:'#b30000', fontWeight:700, fontSize:'1.13rem', margin:0, lineHeight:1.3, flex:1, wordBreak:'break-word'}}>{noti.title}</h4>
+                      <button onClick={()=>setNotifications(list=>list.filter(n=>n.id!==noti.id))} title="Xóa" className="noti-delete-btn" style={{background:'#ffeaea',color:'#b30000',border:'1px solid #b30000',borderRadius:8,padding:'0.3rem 0.7rem',fontWeight:700,cursor:'pointer',fontSize:'1.1rem',transition:'background 0.15s, color 0.15s',marginLeft:'0.5rem'}}><FiTrash2/></button>
+                    </div>
+                    <div className="noti-content" style={{color:'#333', fontSize:'1.01rem', marginBottom:'0.2rem', lineHeight:1.5, paddingLeft:46}}>{noti.content}</div>
+                    <div className="noti-meta" style={{display:'flex',gap:'0.6rem',flexWrap:'wrap',marginBottom:'0.2rem',paddingLeft:46}}>
+                      <span className="noti-badge" style={{background:'#ffeaea',color:'#b30000',border:'1.5px solid #b30000',fontWeight:600,borderRadius:18,fontSize:'0.93rem',padding:'0.22rem 1.1rem',letterSpacing:'0.01em'}}>{noti.target}</span>
+                      <span className="noti-badge type" style={{background:'#fef3c7',color:'#92400e',border:'1.5px solid #f59e42',fontWeight:600,borderRadius:18,fontSize:'0.93rem',padding:'0.22rem 1.1rem',letterSpacing:'0.01em'}}>{noti.type}</span>
+                      <span className="noti-badge method" style={{background:'#f3f4f6',color:'#b30000',border:'1.5px solid #b30000',fontWeight:600,borderRadius:18,fontSize:'0.93rem',padding:'0.22rem 1.1rem',letterSpacing:'0.01em'}}>{noti.method}</span>
+                    </div>
+                    <div className="noti-date" style={{fontSize:'0.97rem', color:'#b30000', fontWeight:500, display:'flex', alignItems:'center', gap:'0.3rem',paddingLeft:46}}><i className="fas fa-calendar-alt" style={{marginRight:4}}></i> {noti.date}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination for Notifications */}
+              {!loading && notifications.length > 0 && notificationsPagination.totalPages > 1 && (
+                <Pagination 
+                  currentPage={notificationsPagination.currentPage}
+                  totalPages={notificationsPagination.totalPages}
+                  totalItems={notificationsPagination.totalNotifications}
+                  limit={notificationsPagination.limit}
+                  onPageChange={(newPage) => setNotificationsPagination(prev => ({ ...prev, currentPage: newPage }))}
+                  loading={loading}
+                  itemName="thông báo"
+                />
+              )}
             </section>
           )}
           {activeTab === 'advertisements' && (
             <section>
-              <div className="section-header">
+              <div className="section-header" style={{justifyContent:'space-between',alignItems:'center',gap:'1rem'}}>
                 <h2 className="section-title">
                   <MdCampaign className="icon" />
                   Quản lý Quảng cáo
                 </h2>
+                <button className="btn btn-primary" style={{background:'#b30000'}} onClick={handleAddAdvertisement}>
+                  <FiPlus className="icon" />
+                  Thêm quảng cáo
+                </button>
               </div>
-              <div style={{padding: '2rem', textAlign: 'center', color: '#b30000', fontWeight: 500}}>
-                Chức năng quản lý quảng cáo sẽ được phát triển tại đây.
-              </div>
-            </section>
-          )}
-          {activeTab === 'tuition' && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdPayment className="icon" />
-                  Quản lý Học phí
-                </h2>
-              </div>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Học viên</th>
-                    <th>Khóa học</th>
-                    <th>Số tiền</th>
-                    <th>Ngày</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockData.payments.map(payment => (
-                    <tr key={payment.id}>
-                      <td>{payment.student}</td>
-                      <td>{payment.course}</td>
-                      <td>{payment.amount} VNĐ</td>
-                      <td>{payment.date}</td>
-                      <td>
-                        <span className={`status-badge ${payment.status === 'Đã thanh toán' ? 'success' : 'warning'}`}>
-                          <i className="fas fa-circle"></i>
-                          {payment.status}
-                        </span>
-                      </td>
+
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{width: '20%'}}>Tiêu đề</th>
+                      <th style={{width: '15%'}}>Ngày bắt đầu</th>
+                      <th style={{width: '15%'}}>Ngày kết thúc</th>
+                      <th style={{width: '15%'}}>Trạng thái</th>
+                      <th style={{width: '14%'}}>Thao tác</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
-          {activeTab === 'notifications' && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdNotifications className="icon" />
-                  Quản lý Thông báo
-                </h2>
+                  </thead>
+                  <tbody>
+                    {advertisements.length === 0 ? (
+                      <tr><td colSpan="5" style={{textAlign:'center',padding:'2rem',color:'#b30000'}}>Chưa có quảng cáo nào</td></tr>
+                    ) : paginatedAdvertisements.map(ad => (
+                      <tr key={ad.id} style={{cursor:'pointer'}} onClick={e=>handleAdRowClick(ad, e)}>
+                        <td style={{fontWeight:600,color:'#b30000'}}>{ad.title}</td>
+                        <td>{new Date(ad.startDate).toLocaleDateString('vi-VN')}</td>
+                        <td>{new Date(ad.endDate).toLocaleDateString('vi-VN')}</td>
+                        <td>
+                          <span className={`status-badge ${ad.status === 'Hoạt động' ? 'success' : 'warning'}`}
+                            style={{
+                              backgroundColor: ad.status === 'Hoạt động' ? '#dcfce7' : '#ffeaea',
+                              color: ad.status === 'Hoạt động' ? '#166534' : '#b30000',
+                              border: ad.status === 'Hoạt động' ? '1px solid #16a34a' : '1px solid #b30000',
+                              fontWeight: 600
+                            }}
+                          >
+                            {ad.status}
+                          </span>
+                        </td>
+                        <td style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                          <button className="btn btn-secondary" style={{background:'#fff',color:'#b30000',border:'1px solid #b30000',borderRadius:8,fontWeight:600}}
+                            onClick={() => handleEditAdvertisement(ad)}
+                          >Sửa</button>
+                          <button className="btn btn-secondary" style={{background:'#fff',color:'#92400e',border:'1px solid #92400e',borderRadius:8,fontWeight:600}}
+                            onClick={() => handleToggleAdvertisementStatus(ad.id)}
+                          >
+                            {ad.status === 'Hoạt động' ? 'Ngừng' : 'Kích hoạt'}
+                          </button>
+                          <button className="btn btn-danger" style={{background:'#ffeaea',color:'#b30000',border:'1px solid #b30000',borderRadius:8,fontWeight:600}}
+                            onClick={() => handleDeleteAdvertisement(ad.id)}
+                          >Xóa</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div style={{padding: '2rem', textAlign: 'center', color: '#b30000', fontWeight: 500}}>
-                Chức năng quản lý thông báo sẽ được phát triển tại đây.
-              </div>
-            </section>
-          )}
-          {activeTab === 'advertisements' && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdCampaign className="icon" />
-                  Quản lý Quảng cáo
-                </h2>
-              </div>
-              <div style={{padding: '2rem', textAlign: 'center', color: '#b30000', fontWeight: 500}}>
-                Chức năng quản lý quảng cáo sẽ được phát triển tại đây.
-              </div>
-            </section>
-          )}
-          {activeTab === 'tuition' && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">
-                  <MdPayment className="icon" />
-                  Quản lý Học phí
-                </h2>
-              </div>
-              <div style={{padding: '2rem', textAlign: 'center', color: '#b30000', fontWeight: 500}}>
-                Chức năng quản lý học phí sẽ được phát triển tại đây.
-              </div>
+
+              {/* Pagination for Advertisements */}
+              {!loading && advertisements.length > 0 && advertisementsPagination.totalPages > 1 && (
+                <Pagination 
+                  currentPage={advertisementsPagination.currentPage}
+                  totalPages={advertisementsPagination.totalPages}
+                  totalItems={advertisementsPagination.totalAdvertisements}
+                  limit={advertisementsPagination.limit}
+                  onPageChange={(newPage) => setAdvertisementsPagination(prev => ({ ...prev, currentPage: newPage }))}
+                  loading={loading}
+                  itemName="quảng cáo"
+                />
+              )}
+
+              {/* Modal thêm/sửa quảng cáo */}
+              {(showAddAdvertisement || showEditAdvertisement) && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:600}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem'}}>
+                      <MdCampaign className="icon" />
+                      {editingAdvertisement ? 'Sửa quảng cáo' : 'Thêm quảng cáo mới'}
+                    </h3>
+                    <form onSubmit={handleAdvertisementSubmit}>
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:120,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Tiêu đề</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={advertisementForm.title} 
+                          onChange={e=>setAdvertisementForm(prev=>({...prev,title:e.target.value}))} 
+                          style={{flex:1,minWidth:0,padding:'0.5rem',borderRadius:6,border:'1px solid #ddd'}}
+                        />
+                      </div>
+                      
+                      <div className="form-group" style={{display:'flex',alignItems:'flex-start',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:120,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap',marginTop:'0.3rem'}}>Nội dung</label>
+                        <textarea 
+                          required 
+                          value={advertisementForm.content} 
+                          onChange={e=>setAdvertisementForm(prev=>({...prev,content:e.target.value}))} 
+                          style={{flex:1,minWidth:0,minHeight:100,padding:'0.5rem',borderRadius:6,border:'1px solid #ddd'}}
+                          placeholder="Nhập nội dung quảng cáo..."
+                        />
+                      </div>
+                      
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:120,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Ngày bắt đầu</label>
+                        <input 
+                          type="date" 
+                          required 
+                          value={advertisementForm.startDate} 
+                          onChange={e=>setAdvertisementForm(prev=>({...prev,startDate:e.target.value}))} 
+                          style={{flex:1,minWidth:0,padding:'0.5rem',borderRadius:6,border:'1px solid #ddd'}}
+                        />
+                      </div>
+                      
+                      <div className="form-group" style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:120,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap'}}>Ngày kết thúc</label>
+                        <input 
+                          type="date" 
+                          required 
+                          value={advertisementForm.endDate} 
+                          onChange={e=>setAdvertisementForm(prev=>({...prev,endDate:e.target.value}))} 
+                          style={{flex:1,minWidth:0,padding:'0.5rem',borderRadius:6,border:'1px solid #ddd'}}
+                        />
+                      </div>
+                      
+                      <div className="form-group" style={{display:'flex',alignItems:'flex-start',gap:'1rem',marginBottom:'1.1rem'}}>
+                        <label style={{minWidth:120,margin:0,color:'#b30000',fontWeight:600,fontSize:'1rem',whiteSpace:'nowrap',marginTop:'0.3rem'}}>Ảnh quảng cáo</label>
+                        <div style={{flex:1,minWidth:0}}>
+                          <input 
+                            type="file" 
+                            multiple 
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            style={{padding:'0.5rem',borderRadius:6,border:'1px solid #ddd',width:'100%'}}
+                          />
+                          <small style={{color:'#666',fontSize:'0.875rem'}}>Có thể chọn nhiều ảnh</small>
+                          
+                          {advertisementForm.images.length > 0 && (
+                            <div style={{marginTop:'1rem',display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:'0.5rem'}}>
+                              {advertisementForm.images.map((image, index) => (
+                                <div key={index} style={{position:'relative',borderRadius:8,overflow:'hidden',border:'2px solid #b30000'}}>
+                                  <img 
+                                    src={image} 
+                                    alt={`Ảnh ${index + 1}`} 
+                                    style={{width:'100%',height:100,objectFit:'cover'}}
+                                  />
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleRemoveImage(index)}
+                                    style={{
+                                      position:'absolute',
+                                      top:4,
+                                      right:4,
+                                      background:'#b30000',
+                                      color:'white',
+                                      border:'none',
+                                      borderRadius:'50%',
+                                      width:24,
+                                      height:24,
+                                      cursor:'pointer',
+                                      fontSize:'0.75rem'
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="form-actions" style={{display:'flex',justifyContent:'flex-end',gap:'1rem'}}>
+                        <button 
+                          type="button" 
+                          className="btn btn-secondary" 
+                          onClick={() => {
+                            setShowAddAdvertisement(false);
+                            setShowEditAdvertisement(false);
+                            setEditingAdvertisement(null);
+                          }}
+                        >
+                          Hủy
+                        </button>
+                        <button 
+                          type="submit" 
+                          className="btn btn-primary" 
+                          style={{background:'#b30000'}}
+                        >
+                          {editingAdvertisement ? 'Cập nhật' : 'Thêm quảng cáo'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              {/* Modal chi tiết quảng cáo */}
+              {showDetailAdvertisement && detailAdvertisement && (
+                <div className="modal">
+                  <div className="modal-content" style={{maxWidth:700}}>
+                    <h3 style={{color:'#b30000',marginBottom:'1.2rem',display:'flex',alignItems:'center',gap:8}}>
+                      <MdCampaign style={{fontSize:'1.5rem'}}/> Chi tiết quảng cáo
+                    </h3>
+                    <div style={{marginBottom:'1.5rem'}}>
+                      <table style={{width:'100%',borderCollapse:'separate',borderSpacing:0,background:'#fff5f5',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 8px #b3000022'}}>
+                        <tbody>
+                          <tr>
+                            <td style={{padding:'0.8rem',fontWeight:600,color:'#b30000',width:'25%',borderBottom:'1px solid #ffeaea'}}>Tiêu đề</td>
+                            <td style={{padding:'0.8rem',textAlign:'left',fontWeight:500,borderBottom:'1px solid #ffeaea'}}>{detailAdvertisement.title}</td>
+                          </tr>
+                          <tr>
+                            <td style={{padding:'0.8rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Nội dung</td>
+                            <td style={{padding:'0.8rem',textAlign:'left',borderBottom:'1px solid #ffeaea',whiteSpace:'pre-wrap',lineHeight:1.5}}>{detailAdvertisement.content}</td>
+                          </tr>
+                          <tr>
+                            <td style={{padding:'0.8rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Ngày bắt đầu</td>
+                            <td style={{padding:'0.8rem',textAlign:'left',borderBottom:'1px solid #ffeaea'}}>{new Date(detailAdvertisement.startDate).toLocaleDateString('vi-VN')}</td>
+                          </tr>
+                          <tr>
+                            <td style={{padding:'0.8rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Ngày kết thúc</td>
+                            <td style={{padding:'0.8rem',textAlign:'left',borderBottom:'1px solid #ffeaea'}}>{new Date(detailAdvertisement.endDate).toLocaleDateString('vi-VN')}</td>
+                          </tr>
+                          <tr>
+                            <td style={{padding:'0.8rem',fontWeight:600,color:'#b30000',borderBottom:'1px solid #ffeaea'}}>Trạng thái</td>
+                            <td style={{padding:'0.8rem',textAlign:'left',borderBottom:'1px solid #ffeaea'}}>
+                              <span className={`status-badge ${detailAdvertisement.status === 'Hoạt động' ? 'success' : 'warning'}`}
+                                style={{
+                                  backgroundColor: detailAdvertisement.status === 'Hoạt động' ? '#dcfce7' : '#ffeaea',
+                                  color: detailAdvertisement.status === 'Hoạt động' ? '#166534' : '#b30000',
+                                  border: detailAdvertisement.status === 'Hoạt động' ? '1px solid #16a34a' : '1px solid #b30000',
+                                  fontWeight: 600,
+                                  padding: '0.3rem 0.8rem',
+                                  borderRadius: 6
+                                }}
+                              >
+                                {detailAdvertisement.status}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{padding:'0.8rem',fontWeight:600,color:'#b30000'}}>Ảnh quảng cáo</td>
+                            <td style={{padding:'0.8rem',textAlign:'left'}}>
+                              {detailAdvertisement.images && detailAdvertisement.images.length > 0 ? (
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))',gap:'1rem'}}>
+                                  {detailAdvertisement.images.map((image, index) => (
+                                    <div key={index} style={{borderRadius:8,overflow:'hidden',border:'2px solid #b30000',boxShadow:'0 2px 8px rgba(179,0,0,0.2)'}}>
+                                      <img 
+                                        src={image} 
+                                        alt={`Ảnh quảng cáo ${index + 1}`} 
+                                        style={{width:'100%',height:150,objectFit:'cover'}}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span style={{color:'#666',fontStyle:'italic'}}>Chưa có ảnh</span>
+                              )}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="form-actions" style={{display:'flex',justifyContent:'center',gap:'1rem'}}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{
+                          background: '#fff',
+                          color: '#b30000',
+                          border: '1px solid #b30000',
+                          minWidth: 90,
+                          fontWeight: 600,
+                          borderRadius: 8,
+                          padding: '0.5rem 1.2rem'
+                        }}
+                        onClick={() => {
+                          setEditingAdvertisement(detailAdvertisement);
+                          setAdvertisementForm({
+                            title: detailAdvertisement.title,
+                            content: detailAdvertisement.content,
+                            startDate: detailAdvertisement.startDate,
+                            endDate: detailAdvertisement.endDate,
+                            images: [...detailAdvertisement.images]
+                          });
+                          setShowEditAdvertisement(true);
+                          setShowDetailAdvertisement(false);
+                        }}
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{
+                          minWidth: 90,
+                          fontWeight: 600,
+                          borderRadius: 8,
+                          padding: '0.5rem 1.2rem'
+                        }}
+                        onClick={() => setShowDetailAdvertisement(false)}
+                      >
+                        Đóng
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </section>
           )}
         </main>
@@ -3414,6 +5041,18 @@ function AdminDashboard({ user, onLogout }) {
           </div>
         </div>
       )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal user={user} onClose={() => setShowProfileModal(false)} />
+      )}
+
+      {/* Notification Modal */}
+      <NotificationModal 
+        isOpen={showNotificationModal} 
+        onClose={() => setShowNotificationModal(false)} 
+        user={user}
+      />
     </div>
   )
 }

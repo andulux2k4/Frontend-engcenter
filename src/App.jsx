@@ -50,6 +50,11 @@ function App() {
     setUser(null)
   }
 
+  const handleGoHome = () => {
+    // Chuyển về trang chủ nhưng vẫn giữ user để có thể quay lại dashboard
+    // Không làm gì cả, chỉ để component tự navigate
+  }
+
   if (loading) {
     return <div className="loading">Đang tải...</div>
   }
@@ -59,13 +64,13 @@ function App() {
 
     switch (user.role?.toLowerCase()) {
       case 'admin':
-        return <AdminDashboard user={user} onLogout={handleLogout} />
+        return <AdminDashboard user={user} onLogout={handleLogout} onGoHome={handleGoHome} />
       case 'teacher':
-        return <TeacherDashboard user={user} onLogout={handleLogout} />
+        return <TeacherDashboard user={user} onLogout={handleLogout} onGoHome={handleGoHome} />
       case 'student':
-        return <StudentDashboard user={user} onLogout={handleLogout} />
+        return <StudentDashboard user={user} onLogout={handleLogout} onGoHome={handleGoHome} />
       case 'parent':
-        return <ParentDashboard user={user} onLogout={handleLogout} />
+        return <ParentDashboard user={user} onLogout={handleLogout} onGoHome={handleGoHome} />
       default:
         return <Navigate to="/login" />
     }
@@ -75,9 +80,9 @@ function App() {
     <Router>
       <div className="App">
       <Routes>
-          <Route path="/" element={user ? renderDashboard() : <LandingPage />} />
-          <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />} />
-          <Route path="/dashboard" element={renderDashboard()} />
+          <Route path="/" element={<LandingPage user={user} onLogout={handleLogout} onGoHome={handleGoHome} />} />
+          <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login onLogin={handleLogin} />} />
+          <Route path="/dashboard" element={user ? renderDashboard() : <Navigate to="/login" />} />
       </Routes>
       </div>
     </Router>

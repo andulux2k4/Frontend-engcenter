@@ -73,6 +73,9 @@ body, html {
   margin-top: 64px;
   flex: 1;
   width: 100%;
+  height: auto;
+  min-height: calc(100vh - 64px);
+  margin-left: 0;
 }
 
 .sidebar {
@@ -88,6 +91,8 @@ body, html {
   overflow-y: auto;
   z-index: 100;
   border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-menu {
@@ -95,6 +100,7 @@ body, html {
   flex-direction: column;
   gap: 0.25rem;
   padding-top: 0.5rem;
+  flex: 1;
 }
 
 .nav-item {
@@ -155,6 +161,12 @@ body, html {
   border-radius: 0 2px 2px 0;
 }
 
+/* Đảm bảo tất cả dashboard đều có min-height 645px cho main-content trên toàn project */
+.main-content {
+  min-height: 645px !important;
+  margin-left: 0;
+}
+
 .dashboard .main-content {
   flex: 1;
   background-color: #f8f9fa;
@@ -162,9 +174,8 @@ body, html {
   padding: 2rem 2.5rem;
   box-shadow: none;
   min-height: calc(100vh - 64px);
-  margin-left: 0;
-  overflow-y: auto;
   width: 100%;
+  height: auto;
 }
 
 @media (min-width: 769px) {
@@ -305,9 +316,16 @@ body, html {
 /* Table responsive styles */
 .table-container {
   overflow-x: auto;
+  overflow-y: visible;
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   background-color: white;
+  min-height: 400px;
+  max-height: none;
+  height: auto;
+  display: block;
+  flex: 1;
+  position: relative;
 }
 
 .data-table {
@@ -315,6 +333,9 @@ body, html {
   border-collapse: collapse;
   font-size: 0.875rem;
   min-width: 800px; /* Ensure minimum width for readability */
+  height: auto;
+  min-height: 300px;
+  table-layout: auto;
 }
 
 .data-table th,
@@ -323,6 +344,8 @@ body, html {
   text-align: left;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
+  height: auto;
+  min-height: 60px;
 }
 
 .data-table th {
@@ -335,9 +358,15 @@ body, html {
   z-index: 10;
 }
 
+.data-table tbody {
+  display: table-row-group;
+}
+
 .data-table tbody tr {
   transition: background-color 0.2s ease;
   min-height: 80px;
+  height: auto;
+  display: table-row;
 }
 
 .data-table tbody tr:nth-child(even) {
@@ -472,6 +501,11 @@ body, html {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
+  .sidebar-bottom-nav {
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+
   .main-content {
     margin-left: 0;
     padding: 1rem;
@@ -508,11 +542,15 @@ body, html {
   .table-container {
     margin: 0 -1rem;
     border-radius: 0;
+    min-height: 300px;
+    height: auto;
   }
 
   .data-table {
     min-width: 600px;
     font-size: 0.8rem;
+    height: auto;
+    min-height: 250px;
   }
 
   .data-table th,
@@ -1021,4 +1059,562 @@ body, html {
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem auto;
+}
+
+/* --- Notification Section Custom --- */
+.notifications-section .section-header {
+  background: linear-gradient(90deg, #b30000 0%, #ffebee 100%);
+  color: #b30000;
+  border: none;
+  box-shadow: 0 2px 8px rgba(179,0,0,0.08);
+}
+
+.notifications-section .section-title {
+  color: #b30000;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.notifications-section .section-actions .btn-primary {
+  background: #b30000;
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.7rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(179,0,0,0.08);
+  transition: background 0.2s;
+}
+.notifications-section .section-actions .btn-primary:hover {
+  background: #a10000;
+}
+
+.notifications-section .card-grid {
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.notifications-section .card {
+  border: 1.5px solid #b30000;
+  background: #fff5f5;
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px rgba(179,0,0,0.06);
+  padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+  min-width: 260px;
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  position: relative;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.notifications-section .card:hover {
+  box-shadow: 0 6px 24px rgba(179,0,0,0.13);
+  transform: translateY(-2px) scale(1.01);
+}
+
+.notifications-section .card h4 {
+  color: #b30000;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 0.2rem 0;
+  line-height: 1.3;
+}
+
+.notifications-section .card .noti-content {
+  color: #333;
+  font-size: 1rem;
+  margin-bottom: 0.2rem;
+  line-height: 1.5;
+}
+
+.notifications-section .card .noti-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+
+.notifications-section .card .noti-badge {
+  background: #ffeaea;
+  color: #b30000;
+  border: 1px solid #b30000;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.25rem 0.9rem;
+  margin-right: 0.2rem;
+  margin-bottom: 0.2rem;
+  display: inline-block;
+}
+.notifications-section .card .noti-badge.type {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e42;
+}
+.notifications-section .card .noti-badge.method {
+  background: #f3f4f6;
+  color: #b30000;
+  border: 1px solid #b30000;
+}
+
+.notifications-section .card .noti-date {
+  font-size: 0.93rem;
+  color: #b30000;
+  font-weight: 500;
+  margin-top: 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.notifications-section .card .noti-delete-btn {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  background: #ffeaea;
+  color: #b30000;
+  border: 1px solid #b30000;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.15s, color 0.15s;
+}
+.notifications-section .card .noti-delete-btn:hover {
+  background: #b30000;
+  color: #fff;
+}
+
+/* Modal notification form */
+.notifications-section .modal-content {
+  max-width: 420px;
+  padding: 2.2rem 2rem 2rem 2rem;
+  border-radius: 1.1rem;
+  border: 1.5px solid #b30000;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(179,0,0,0.13);
+}
+.notifications-section .modal-content h3 {
+  color: #b30000;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  border-bottom: 1.5px solid #ffeaea;
+  padding-bottom: 0.7rem;
+}
+.notifications-section .modal-content .form-group {
+  margin-bottom: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.notifications-section .modal-content .form-group label {
+  color: #b30000;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.1rem;
+}
+.notifications-section .modal-content .form-group input,
+.notifications-section .modal-content .form-group select,
+.notifications-section .modal-content .form-group textarea {
+  border: 1.2px solid #b30000;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  font-size: 1rem;
+  color: #333;
+  background: #fff;
+  transition: border 0.2s;
+}
+.notifications-section .modal-content .form-group input:focus,
+.notifications-section .modal-content .form-group select:focus,
+.notifications-section .modal-content .form-group textarea:focus {
+  border: 1.5px solid #b30000;
+  outline: none;
+}
+.notifications-section .modal-content .form-group textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.notifications-section .modal-content .radio-group-horizontal label {
+  color: #b30000;
+  font-weight: 500;
+  font-size: 1rem;
+  margin-right: 1.2rem;
+}
+.notifications-section .modal-content .radio-group-horizontal input[type="radio"] {
+  accent-color: #b30000;
+  margin-right: 0.3em;
+}
+.notifications-section .modal-content .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.notifications-section .modal-content .btn-primary {
+  background: #b30000;
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.7rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(179,0,0,0.08);
+  transition: background 0.2s;
+}
+.notifications-section .modal-content .btn-primary:hover {
+  background: #a10000;
+}
+.notifications-section .modal-content .btn-secondary {
+  background: #f3f4f6;
+  color: #b30000;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.7rem 1.5rem;
+  border: 1.2px solid #b30000;
+  transition: background 0.2s, color 0.2s;
+}
+.notifications-section .modal-content .btn-secondary:hover {
+  background: #ffeaea;
+  color: #a10000;
+}
+
+@media (max-width: 600px) {
+  .notifications-section .card {
+    min-width: 90vw;
+    max-width: 98vw;
+    padding: 1.1rem 0.7rem;
+  }
+  .notifications-section .modal-content {
+    max-width: 98vw;
+    padding: 1.1rem 0.7rem;
+  }
+}
+
+/* Beautiful Loading Styles */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  min-height: 200px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.loading-spinner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner-small {
+  width: 40px;
+  height: 40px;
+}
+
+.loading-spinner-medium {
+  width: 60px;
+  height: 60px;
+}
+
+.loading-spinner-large {
+  width: 80px;
+  height: 80px;
+}
+
+.spinner-ring {
+  position: absolute;
+  border: 3px solid transparent;
+  border-top: 3px solid #b30000;
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite;
+}
+
+.loading-spinner-small .spinner-ring {
+  width: 30px;
+  height: 30px;
+  border-width: 2px;
+}
+
+.loading-spinner-medium .spinner-ring {
+  width: 50px;
+  height: 50px;
+  border-width: 3px;
+}
+
+.loading-spinner-large .spinner-ring {
+  width: 70px;
+  height: 70px;
+  border-width: 4px;
+}
+
+.spinner-ring:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.spinner-ring:nth-child(2) {
+  width: 60%;
+  height: 60%;
+  animation-delay: 0.2s;
+  border-top-color: #dc2626;
+}
+
+.spinner-ring:nth-child(3) {
+  width: 40%;
+  height: 40%;
+  animation-delay: 0.4s;
+  border-top-color: #ef4444;
+}
+
+.loading-text {
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #374151;
+  text-align: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Loading overlay for modals */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.loading-overlay .loading-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 2rem;
+}
+
+/* Table loading state */
+.table-loading {
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card loading state */
+.card-loading {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Responsive loading */
+@media (max-width: 768px) {
+  .loading-container {
+    padding: 2rem 1rem;
+    min-height: 150px;
+  }
+  
+  .loading-spinner-medium {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .loading-text {
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+}
+
+/* Hamburger Menu Styles */
+.hamburger-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.hamburger-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.hamburger-btn:hover {
+  background-color: rgba(179, 0, 0, 0.1);
+}
+
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 20px;
+  height: 16px;
+}
+
+.hamburger-icon span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: #b30000;
+  border-radius: 1px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  min-width: 180px;
+  z-index: 1000;
+  margin-top: 0.5rem;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.menu-item:hover {
+  background-color: #f3f4f6;
+  color: #b30000;
+}
+
+.menu-item .icon {
+  font-size: 1rem;
+  color: #6b7280;
+}
+
+.menu-item:hover .icon {
+  color: #b30000;
+}
+
+/* Profile Modal Styles */
+.profile-info {
+  display: flex;
+  gap: 2rem;
+  margin: 1.5rem 0;
+}
+
+.profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #b30000 0%, #dc2626 100%);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avatar-icon {
+  font-size: 3rem;
+  color: white;
+}
+
+.profile-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background-color: #f9fafb;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.profile-input:focus {
+  outline: none;
+  border-color: #b30000;
+  box-shadow: 0 0 0 3px rgba(179, 0, 0, 0.1);
+}
+
+/* Responsive hamburger menu */
+@media (max-width: 768px) {
+  .hamburger-dropdown {
+    right: -1rem;
+    min-width: 160px;
+  }
+  
+  .profile-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .avatar-icon {
+    font-size: 2.5rem;
+  }
+}
+
+/* Sidebar bottom navigation */
+.sidebar-bottom-nav {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-bottom-nav .nav-item {
+  background-color: #f8f9fa;
+  border: 1px solid #e5e7eb;
+}
+
+.sidebar-bottom-nav .nav-item:hover {
+  background-color: #fef2f2;
+  border-color: #b30000;
+}
+
+.sidebar-bottom-nav .nav-item:last-child {
+  margin-bottom: 0;
 } 

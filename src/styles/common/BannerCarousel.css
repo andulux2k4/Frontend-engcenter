@@ -1,0 +1,89 @@
+.banner-carousel {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto 2rem auto;
+  position: relative;
+  overflow: visible;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(179,0,0,0.12);
+  background: #fff;
+  z-index: 1;
+}
+.carousel-slide {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+.carousel-img {
+  width: 100%;
+  height: 500px;
+  object-fit: cover;
+  border-radius: 24px;
+  z-index: 2;
+}
+.carousel-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  text-align: center;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  background: rgba(179,0,0,0.25);
+  padding: 0.5rem 0;
+  border-radius: 0 0 18px 18px;
+}
+.carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.7);
+  border: none;
+  font-size: 2rem;
+  color: #b30000;
+  padding: 0.2rem 1rem;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.2s;
+}
+.carousel-btn:hover {
+  background: #fff;
+}
+.carousel-btn.prev {
+  left: 18px;
+  display: flex;
+}
+.carousel-btn.next {
+  right: 18px;
+  display: flex;
+}
+.carousel-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  text-align: center;
+  z-index: 10;
+}
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin: 0 4px;
+  background: #fff;
+  border-radius: 50%;
+  border: 2px solid #b30000;
+  cursor: pointer;
+  transition: background 0.2s, border 0.2s;
+}
+.dot.active {
+  background: #b30000;
+  border: 2px solid #b30000;
+}

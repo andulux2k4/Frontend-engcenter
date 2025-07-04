@@ -169,6 +169,63 @@ body {
   border: 1px solid #ffcdd2;
 }
 
+.success-message {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  padding: 1rem;
+  border-radius: 5px;
+  margin-bottom: 1rem;
+  text-align: center;
+  border: 1px solid #c8e6c9;
+}
+
+.captcha-section {
+  margin-bottom: 1.5rem;
+}
+
+.captcha-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 5px;
+  border: 2px solid #ffb3b3;
+}
+
+.captcha-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #b30000;
+  background-color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  border: 2px solid #b30000;
+  letter-spacing: 3px;
+  user-select: none;
+  min-width: 120px;
+  text-align: center;
+}
+
+.refresh-captcha {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  color: #b30000;
+}
+
+.refresh-captcha:hover {
+  background-color: #b30000;
+  color: white;
+  transform: rotate(180deg);
+}
+
 @media (max-width: 1024px) {
   .login-container {
     flex-direction: column;

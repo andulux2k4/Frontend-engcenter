@@ -1,3 +1,5 @@
+
+import React from 'react';
 import { FaGraduationCap, FaUsers, FaBook, FaChartLine, FaCertificate, FaHeadset } from 'react-icons/fa'
 import '../../styles/pages/Features.css'
 

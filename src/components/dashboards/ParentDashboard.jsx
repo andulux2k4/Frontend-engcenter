@@ -1,132 +1,220 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../../styles/dashboard/parent.css';
-import {
-  FaUserFriends,
-  FaSignOutAlt,
-  FaChartLine,
-  FaChild,
-  FaMoneyBillWave,
-  FaCalendarAlt,
-  FaChartPie,
-  FaBook,
-  FaUser,
-  FaChalkboardTeacher,
-  FaStar,
-  FaComments,
-  FaDollarSign,
-  FaCalendar,
-  FaInfoCircle,
-  FaCogs,
-  FaCreditCard,
-  FaClock,
-  FaDoorOpen,
-  FaCircle,
-  FaUserCircle,
-  FaUserGraduate,
-  FaUserCheck
-} from 'react-icons/fa';
+import ParentBurgerIcon from '../common/ParentBurgerIcon';
+import qrImage from '../../assets/QR_CODE.png';
+import ParentOverview from './components/ParentOverview';
+import ChildrenList from './components/ChildrenList';
+import PaymentHistory from './components/PaymentHistory';
+import PaymentDetailModal from './components/modals/PaymentDetailModal';
+import { FaUserFriends, FaChartLine, FaChild, FaMoneyBillWave } from 'react-icons/fa';
+import { FiUser, FiHome, FiLogOut } from 'react-icons/fi';
+import { MdNotifications } from 'react-icons/md';
+import apiService from '../../services/api';
+import { useNavigate } from 'react-router-dom';
+import ProfileModal from './components/modals/ProfileModal';
+import NotificationModal from './components/modals/NotificationModal';
 
 function ParentDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(3);
 
-  const mockData = {
-    stats: {
-      totalChildren: 2,
-      totalCourses: 3,
-      nextPayment: '25/03/2024',
-      totalFees: '15.000.000'
-    },
-    children: [
-      {
-        id: 1,
-        name: 'Alice Brown',
-        age: 15,
-        grade: '10',
-        courses: [
-          {
-            name: 'IELTS Advanced',
-            teacher: 'Sarah Johnson',
-            attendance: '90%',
-            progress: 'Excellent'
-          },
-          {
-            name: 'TOEIC Preparation',
-            teacher: 'John Smith',
-            attendance: '85%',
-            progress: 'Good'
+  // State cho tổng quan lấy từ API
+  const [overviewStats, setOverviewStats] = useState({
+    totalChildren: 0,
+    totalCourses: 0,
+    nextPayment: '',
+    totalFees: 0
+  });
+  // ... giữ lại các state khác nếu cần ...
+
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  // const [verificationImage, setVerificationImage] = useState(null); // Đã comment vì không dùng trực tiếp
+  const [verificationPreview, setVerificationPreview] = useState(null);
+  const [payments, setPayments] = useState([]);
+  // State để lưu danh sách children lấy từ API
+  const [childrenList, setChildrenList] = useState([]);
+  // State để lưu danh sách payments chưa đóng lấy từ API
+  const [unpaidPayments, setUnpaidPayments] = useState([]);
+  // State để loading khi gửi payment request
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log('User info:', user);
+    console.log('User token:', user?.token);
+    console.log('apiService token:', apiService.getToken());
+  }, [user]);
+
+  // Reset lại trang và payments khi chuyển tab
+  useEffect(() => {
+    if (activeTab === 'payments') {
+      setCurrentPage(1);
+      // Có thể fetch lại payments từ API nếu muốn, hiện tại không cần đồng bộ với mockData
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (user && user.roleId) {
+      const token = apiService.getToken && apiService.getToken();
+      
+      console.log('=== PARENT CHILDREN DETAILS API CALL ===');
+      console.log('User:', user);
+      console.log('User roleId:', user.roleId);
+      console.log('Token:', token);
+      console.log('API URL 1:', `https://english-center-website.onrender.com/v1/api/parents/${user.roleId}/children-details`);
+      console.log('API URL 2:', `https://english-center-website.onrender.com/v1/api/parents/my-children-details`);
+      
+      // 1. Test endpoint với parentId
+      apiService.getParentChildrenDetails(token, user.roleId).then(res => {
+        console.log('=== CHILDREN DETAILS API RESPONSE (with parentId) ===');
+        console.log('Full response:', res);
+        console.log('Response data:', res?.data);
+        console.log('Response status:', res?.status);
+        console.log('Response headers:', res?.headers);
+        
+        // Lấy tổng số học sinh (student) từ mảng data trả về
+        const childrenData = res?.data || [];
+        console.log('Children data array:', childrenData);
+        console.log('Number of children:', childrenData.length);
+        
+        setChildrenList(childrenData); // Lưu children vào state để truyền cho ChildrenList
+        const totalStudents = childrenData.length;
+        console.log('Total students:', totalStudents);
+        
+        // Nếu muốn lấy tổng số lớp học từ attendanceSummary của từng học sinh:
+        let totalClasses = 0;
+        childrenData.forEach((child, index) => {
+          console.log(`Child ${index + 1}:`, child);
+          if (child.attendanceSummary && typeof child.attendanceSummary.totalClasses === 'number') {
+            totalClasses += child.attendanceSummary.totalClasses;
+            console.log(`Child ${index + 1} attendance summary:`, child.attendanceSummary);
           }
-        ]
-      },
-      {
-        id: 2,
-        name: 'Bob Brown',
-        age: 13,
-        grade: '8',
-        courses: [
-          {
-            name: 'English for Teens',
-            teacher: 'Mary Wilson',
-            attendance: '95%',
-            progress: 'Very Good'
+        });
+        console.log('Total classes calculated:', totalClasses);
+
+        setOverviewStats(prev => ({
+          ...prev,
+          totalChildren: totalStudents,
+          totalCourses: totalClasses
+        }));
+        
+        console.log('=== CHILDREN DETAILS API CALL COMPLETED (with parentId) ===');
+      }).catch(err => {
+        console.error('=== CHILDREN DETAILS API ERROR (with parentId) ===');
+        console.error('Error object:', err);
+        console.error('Error message:', err.message);
+        console.error('Error stack:', err.stack);
+        console.error('Error response:', err.response);
+        console.error('Error response data:', err.response?.data);
+        console.error('Error response status:', err.response?.status);
+        console.error('Error response headers:', err.response?.headers);
+        console.error('API /v1/api/parents/:parentId/children-details error', err);
+      });
+
+      // 2. Test endpoint my-children-details
+      console.log('=== MY CHILDREN DETAILS API CALL ===');
+      apiService.getMyChildrenDetails(token).then(res => {
+        console.log('=== MY CHILDREN DETAILS API RESPONSE ===');
+        console.log('Full response:', res);
+        console.log('Response data:', res?.data);
+        console.log('Response status:', res?.status);
+        console.log('Response headers:', res?.headers);
+        
+        const myChildrenData = res?.data || [];
+        console.log('My children data array:', myChildrenData);
+        console.log('Number of my children:', myChildrenData.length);
+        
+        console.log('=== MY CHILDREN DETAILS API CALL COMPLETED ===');
+      }).catch(err => {
+        console.error('=== MY CHILDREN DETAILS API ERROR ===');
+        console.error('Error object:', err);
+        console.error('Error message:', err.message);
+        console.error('Error stack:', err.stack);
+        console.error('Error response:', err.response);
+        console.error('Error response data:', err.response?.data);
+        console.error('Error response status:', err.response?.status);
+        console.error('Error response headers:', err.response?.headers);
+        console.error('API /v1/api/parents/my-children-details error', err);
+      });
+      
+      // 3. Unpaid payments
+      console.log('=== UNPAID PAYMENTS API CALL ===');
+      console.log('Calling unpaid payments API...');
+      
+      apiService.getUnpaidPayments(token, user.roleId).then(res => {
+        console.log('=== UNPAID PAYMENTS API RESPONSE ===');
+        console.log('Full response:', res);
+        console.log('Response data:', res?.data);
+        
+        // Lấy hạn thanh toán và tổng học phí chưa đóng từ dữ liệu trả về
+        const data = res?.data || {};
+        let nextPayment = '';
+        let totalFees = 0;
+        let allUnpaid = [];
+        // Lấy unpaid payments của từng học sinh
+        if (Array.isArray(data.children) && data.children.length > 0) {
+          data.children.forEach(child => {
+            if (Array.isArray(child.unpaidPayments)) {
+              allUnpaid = allUnpaid.concat(child.unpaidPayments.map(p => ({...p, childName: child.name})));
+            }
+          });
+          if (allUnpaid.length > 0) {
+            allUnpaid.sort((a, b) => (b.year - a.year) || (b.month - a.month));
+            nextPayment = `${allUnpaid[0].month}/${allUnpaid[0].year}`;
           }
-        ]
+        }
+        // Lưu danh sách unpaid payments vào state
+        setUnpaidPayments(allUnpaid);
+        // Lấy tổng học phí chưa đóng
+        totalFees = data.totalUnpaidAmount || 0;
+        setOverviewStats(prev => ({
+          ...prev,
+          nextPayment,
+          totalFees
+        }));
+        
+        console.log('=== UNPAID PAYMENTS API CALL COMPLETED ===');
+      }).catch(err => {
+        console.error('=== UNPAID PAYMENTS API ERROR ===');
+        console.error('Error object:', err);
+        console.error('Error message:', err.message);
+        console.error('Error response:', err.response);
+        console.error('API /v1/api/parents/:parentId/unpaid-payments error', err);
+      });
+    }
+  }, [user]);
+
+  // Lấy thông báo mới nhất khi load dashboard
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      setLoadingNotifications(true);
+      try {
+        const token = apiService.getToken();
+        const res = await apiService.getNotificationsForRole(token); // Lấy thông báo theo vai trò
+        if (res && res.data && Array.isArray(res.data)) {
+          setNotifications(res.data);
+        } else if (res && res.notifications && Array.isArray(res.notifications)) {
+          setNotifications(res.notifications);
+        } else {
+          setNotifications([]);
+        }
+      } catch (e) {
+        setNotifications([]);
+      } finally {
+        setLoadingNotifications(false);
       }
-    ],
-    payments: [
-      {
-        id: 1,
-        child: 'Alice Brown',
-        course: 'IELTS Advanced',
-        amount: '5.000.000',
-        dueDate: '25/03/2024',
-        status: 'Chưa thanh toán'
-      },
-      {
-        id: 2,
-        child: 'Alice Brown',
-        course: 'TOEIC Preparation',
-        amount: '5.000.000',
-        dueDate: '25/03/2024',
-        status: 'Chưa thanh toán'
-      },
-      {
-        id: 3,
-        child: 'Bob Brown',
-        course: 'English for Teens',
-        amount: '5.000.000',
-        dueDate: '25/03/2024',
-        status: 'Chưa thanh toán'
-      }
-    ],
-    schedule: [
-      {
-        id: 1,
-        child: 'Alice Brown',
-        course: 'IELTS Advanced',
-        time: '18:00-20:00',
-        date: 'Thứ 2, 18/03/2024',
-        room: 'Phòng 101'
-      },
-      {
-        id: 2,
-        child: 'Alice Brown',
-        course: 'TOEIC Preparation',
-        time: '17:30-19:30',
-        date: 'Thứ 3, 19/03/2024',
-        room: 'Phòng 203'
-      },
-      {
-        id: 3,
-        child: 'Bob Brown',
-        course: 'English for Teens',
-        time: '15:00-17:00',
-        date: 'Thứ 4, 20/03/2024',
-        room: 'Phòng 102'
-      }
-    ]
-  };
+    };
+    fetchNotifications();
+  }, []);
 
   const renderHeader = () => (
     <header className="parent-header">
@@ -136,10 +224,6 @@ function ParentDashboard({ user, onLogout }) {
       </h1>
       <div className="parent-info">
         <span> Xin chào, {user?.name}</span>
-        <button onClick={onLogout} className="logout-btn">
-          <FaSignOutAlt />
-          Đăng xuất
-        </button>
       </div>
     </header>
   );
@@ -151,671 +235,281 @@ function ParentDashboard({ user, onLogout }) {
           className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
-          <FaChartLine />
-          Tổng quan
+          <FaChartLine style={{marginRight: 8}} /> Tổng quan
         </button>
         <button 
           className={`nav-item ${activeTab === 'children' ? 'active' : ''}`}
           onClick={() => setActiveTab('children')}
         >
-          <FaChild />
-          Con em
+          <FaChild style={{marginRight: 8}} /> Con em
         </button>
         <button 
           className={`nav-item ${activeTab === 'payments' ? 'active' : ''}`}
           onClick={() => setActiveTab('payments')}
         >
-          <FaMoneyBillWave />
-          Học phí
+          <FaMoneyBillWave style={{marginRight: 8}} /> Học phí
         </button>
       </nav>
+      
+      {/* Navigation menu ở góc dưới sidebar */}
+      <div className="sidebar-bottom-nav">
+      <button 
+          className="nav-item"
+          onClick={() => setShowProfileModal(true)}
+        >
+          <FiUser className="icon" />
+          Hồ sơ
+        </button>
+        <button
+          className="nav-item"
+          style={{ position: 'relative' }}
+          onClick={() => setShowNotificationModal(true)}
+        >
+          <MdNotifications className="icon" />
+          Thông báo
+          {notifications.length > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: 8,
+              right: 12,
+              background: '#b30000',
+              color: 'white',
+              borderRadius: '50%',
+              fontSize: '0.8rem',
+              width: 20,
+              height: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700
+            }}>{notifications.length}</span>
+          )}
+        </button>
+        
+        <button 
+          className="nav-item"
+          onClick={() => navigate('/')}
+        >
+          <FiHome className="icon" />
+          Trang chủ
+        </button>
+        <button 
+          className="nav-item"
+          onClick={() => onLogout()}
+        >
+          <FiLogOut className="icon" />
+          Đăng xuất
+        </button>
+      </div>
     </aside>
   );
 
-  const renderOverview = () => (
-    <section>
-      <div className="parent-section-header">
-        <h2 className="parent-section-title">
-          <FaChartPie />
-          Tổng quan
-        </h2>
-      </div>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '1.5rem',
-        padding: '0.5rem 0',
-        overflowX: 'auto'
-      }}>
-        <div className="parent-card" style={{
-          minWidth: '200px',
-          flex: '1',
-          background: 'linear-gradient(135deg, #fff 0%, #fff5f5 100%)',
-          border: '2px solid #ffebee',
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          cursor: 'pointer'
-        }} onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-5px)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(179, 0, 0, 0.15)';
-        }} onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-        }}>
-          <div className="card-content">
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b30000' }}>
-              <FaChild />
-              Số con em
-            </h3>
-            <p className="stat" style={{
-              fontSize: '1.rem',
-              fontWeight: '700',
-              color: '#b30000',
-              margin: '1rem 0',
-              textAlign: 'center'
-            }}>
-              <FaUserFriends />
-              {mockData.stats.totalChildren}
-            </p>
-            <p style={{
-              textAlign: 'center',
-              color: '#666',
-              fontSize: '0.9rem',
-              margin: '0'
-            }}>Con em đang theo học</p>
-          </div>
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '80px',
-            height: '80px',
-            backgroundColor: 'rgba(179, 0, 0, 0.1)',
-            borderRadius: '50%',
-            zIndex: 0
-          }}></div>
-        </div>
-        
-        <div className="parent-card" style={{
-          minWidth: '200px',
-          flex: '1',
-          background: 'linear-gradient(135deg, #fff 0%, #fff5f5 100%)',
-          border: '2px solid #ffebee',
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          cursor: 'pointer'
-        }} onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-5px)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(179, 0, 0, 0.15)';
-        }} onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-        }}>
-          <div className="card-content">
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b30000' }}>
-              <FaBook />
-              Tổng khóa học
-            </h3>
-            <p className="stat" style={{
-              fontSize: '1.4rem',
-              fontWeight: '700',
-              color: '#b30000',
-              margin: '1rem 0',
-              textAlign: 'center'
-            }}>
-              <FaBook />
-              {mockData.stats.totalCourses}
-            </p>
-            <p style={{
-              textAlign: 'center',
-              color: '#666',
-              fontSize: '0.9rem',
-              margin: '0'
-            }}>Khóa học đang tham gia</p>
-          </div>
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '80px',
-            height: '80px',
-            backgroundColor: 'rgba(179, 0, 0, 0.1)',
-            borderRadius: '50%',
-            zIndex: 0
-          }}></div>
-        </div>
-        
-        <div className="parent-card" style={{
-          minWidth: '200px',
-          flex: '1',
-          background: 'linear-gradient(135deg, #fff 0%, #fff5f5 100%)',
-          border: '2px solid #ffebee',
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          cursor: 'pointer'
-        }} onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-5px)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(179, 0, 0, 0.15)';
-        }} onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-        }}>
-          <div className="card-content">
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b30000' }}>
-              <FaCalendarAlt />
-              Thanh toán tới
-            </h3>
-            <p className="stat" style={{
-              fontSize: '1.4rem',
-              fontWeight: '700',
-              color: '#b30000',
-              margin: '1rem 0',
-              textAlign: 'center'
-            }}>
-              <FaCalendarAlt />
-              {mockData.stats.nextPayment}
-            </p>
-            <p style={{
-              textAlign: 'center',
-              color: '#666',
-              fontSize: '0.9rem',
-              margin: '0'
-            }}>Hạn thanh toán</p>
-          </div>
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '80px',
-            height: '80px',
-            backgroundColor: 'rgba(179, 0, 0, 0.1)',
-            borderRadius: '50%',
-            zIndex: 0
-          }}></div>
-        </div>
-        
-        <div className="parent-card" style={{
-          minWidth: '200px',
-          flex: '1',
-          background: 'linear-gradient(135deg, #fff 0%, #fff5f5 100%)',
-          border: '2px solid #ffebee',
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          cursor: 'pointer'
-        }} onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-5px)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(179, 0, 0, 0.15)';
-        }} onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-        }}>
-          <div className="card-content">
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b30000' }}>
-              <FaMoneyBillWave />
-              Tổng học phí
-            </h3>
-            <p className="stat" style={{
-              fontSize: '1.4rem',
-              fontWeight: '700',
-              color: '#b30000',
-              margin: '1rem 0',
-              textAlign: 'center'
-            }}>
-              <FaMoneyBillWave />
-              {mockData.stats.totalFees} VNĐ
-            </p>
-            <p style={{
-              textAlign: 'center',
-              color: '#666',
-              fontSize: '0.9rem',
-              margin: '0'
-            }}>Học phí tháng này</p>
-          </div>
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '80px',
-            height: '80px',
-            backgroundColor: 'rgba(179, 0, 0, 0.1)',
-            borderRadius: '50%',
-            zIndex: 0
-          }}></div>
-        </div>
-      </div>
-    </section>
-  );
-
-  const renderChildren = () => {
-    // Tính toán pagination
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = mockData.children.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(mockData.children.length / itemsPerPage);
-
-    const handlePageChange = (pageNumber) => {
-      setCurrentPage(pageNumber);
-    };
-
-    return (
-    <section>
-      <div className="parent-section-header">
-        <h2 className="parent-section-title">
-          <FaChild />
-          Con em của tôi
-        </h2>
-      </div>
-        
-        {/* Children Container */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'row',
-          gap: '1.5rem',
-          padding: '0.5rem 0',
-          overflowX: 'auto',
-          marginBottom: '2rem'
-        }}>
-          {currentItems.map(child => (
-            <div key={child.id} className="parent-card" style={{
-              minWidth: '300px',
-              flex: '1',
-              background: 'linear-gradient(135deg, #fff 0%, #fff5f5 100%)',
-              border: '2px solid #ffebee',
-              position: 'relative',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer'
-            }} onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 10px 25px rgba(179, 0, 0, 0.15)';
-            }} onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-            }}>
-            <div className="card-content">
-                <h3 style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem', 
-                  color: '#b30000',
-                  marginBottom: '1rem'
-                }}>
-                <FaUser />
-                {child.name}
-              </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FaChild style={{ color: '#b30000', minWidth: '16px' }} />
-                    <span style={{ fontWeight: '600', minWidth: '80px' }}>Tuổi:</span>
-                <span>{child.age}</span>
-              </p>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FaUserGraduate style={{ color: '#b30000', minWidth: '16px' }} />
-                    <span style={{ fontWeight: '600', minWidth: '80px' }}>Lớp:</span>
-                <span>{child.grade}</span>
-              </p>
-              <div className="courses-list">
-                    <h4 style={{ color: '#b30000', marginBottom: '0.75rem' }}><FaBook /> Khóa học đang theo:</h4>
-                {child.courses.map((course, index) => (
-                      <div key={index} className="course-item" style={{
-                        background: '#fef2f2',
-                        border: '1px solid #fee2e2',
-                        borderRadius: '6px',
-                        padding: '0.75rem',
-                        marginBottom: '0.75rem'
-                      }}>
-                        <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0' }}>
-                          <FaBook style={{ color: '#b30000', minWidth: '16px' }} />
-                          <span style={{ fontWeight: '600', minWidth: '90px' }}>Khóa học:</span>
-                      <span>{course.name}</span>
-                    </p>
-                        <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0' }}>
-                          <FaChalkboardTeacher style={{ color: '#b30000', minWidth: '16px' }} />
-                          <span style={{ fontWeight: '600', minWidth: '90px' }}>Giáo viên:</span>
-                      <span>{course.teacher}</span>
-                    </p>
-                        <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0' }}>
-                          <FaUserCheck style={{ color: '#b30000', minWidth: '16px' }} />
-                          <span style={{ fontWeight: '600', minWidth: '90px' }}>Chuyên cần:</span>
-                      <span>{course.attendance}</span>
-                    </p>
-                        <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0' }}>
-                          <FaStar style={{ color: '#b30000', minWidth: '16px' }} />
-                          <span style={{ fontWeight: '600', minWidth: '90px' }}>Kết quả:</span>
-                      <span>{course.progress}</span>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-              </div>
-              <div className="action-buttons" style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                gap: '1rem',
-                padding: '1rem',
-                borderTop: '1px solid #ffebee'
-              }}>
-                <button className="btn btn-secondary" style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #0066cc',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  transition: 'all 0.3s ease'
-                }} onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0066cc';
-                  e.currentTarget.style.color = 'white';
-                }} onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.color = '#0066cc';
-                }}>
-                  <FaChartLine />
-                  <span>Tiến độ</span>
-              </button>
-                <button className="btn btn-secondary" style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #28a745',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  transition: 'all 0.3s ease'
-                }} onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#28a745';
-                  e.currentTarget.style.color = 'white';
-                }} onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.color = '#28a745';
-                }}>
-                  <FaComments />
-                  <span>Liên hệ GV</span>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginTop: '2rem'
-          }}>
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #b30000',
-                backgroundColor: currentPage === 1 ? '#f5f5f5' : 'white',
-                color: currentPage === 1 ? '#999' : '#b30000',
-                borderRadius: '5px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Trước
-            </button>
-            
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(pageNumber => (
-              <button
-                key={pageNumber}
-                onClick={() => handlePageChange(pageNumber)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid #b30000',
-                  backgroundColor: currentPage === pageNumber ? '#b30000' : 'white',
-                  color: currentPage === pageNumber ? 'white' : '#b30000',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {pageNumber}
-              </button>
-            ))}
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #b30000',
-                backgroundColor: currentPage === totalPages ? '#f5f5f5' : 'white',
-                color: currentPage === totalPages ? '#999' : '#b30000',
-                borderRadius: '5px',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Sau
-            </button>
-          </div>
-        )}
-    </section>
-  );
+  const handleOpenPaymentModal = (payment) => {
+    console.log('Open payment modal for:', payment);
+    console.log('Payment ID:', payment._id || payment.id);
+    setSelectedPayment(payment);
+    // Ưu tiên lấy amount, amountDue, unpaidAmount, hoặc 0
+    setPaymentAmount(
+      payment.amount || payment.amountDue || payment.unpaidAmount || ''
+    );
+    setShowPaymentModal(true);
+    setVerificationPreview(null);
   };
 
-  const renderPayments = () => {
-    // Tính toán pagination
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = mockData.payments.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(mockData.payments.length / itemsPerPage);
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedPayment(null);
+    setPaymentAmount('');
+    // setVerificationImage(null); // Đã loại bỏ biến không dùng
+    setVerificationPreview(null);
+  };
 
-    const handlePageChange = (pageNumber) => {
-      setCurrentPage(pageNumber);
-    };
+  const handleVerificationImageChange = (e) => {
+    const file = e.target.files[0];
+    // setVerificationImage(file); // Đã loại bỏ biến không dùng
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setVerificationPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setVerificationPreview(null);
+    }
+  };
 
-    return (
-    <section>
-      <div className="parent-section-header">
-        <h2 className="parent-section-title">
-          <FaMoneyBillWave />
-          Quản lý học phí
-        </h2>
-      </div>
-        
-        {/* Payments Container */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'row',
-          gap: '1.5rem',
-          padding: '0.5rem 0',
-          overflowX: 'auto',
-          marginBottom: '2rem'
-        }}>
-          {currentItems.map(payment => (
-            <div key={payment.id} className="parent-card" style={{
-              minWidth: '300px',
-              flex: '1',
-              background: 'linear-gradient(135deg, #fff 0%, #fff5f5 100%)',
-              border: '2px solid #ffebee',
-              position: 'relative',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer'
-            }} onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 10px 25px rgba(179, 0, 0, 0.15)';
-            }} onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-            }}>
-              <div className="card-content">
-                <h3 style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem', 
-                  color: '#b30000',
-                  marginBottom: '1rem'
-                }}>
-                  <FaUser />
-                  {payment.child}
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FaBook style={{ color: '#b30000', minWidth: '16px' }} />
-                    <span style={{ fontWeight: '600', minWidth: '80px' }}>Khóa học:</span>
-                    <span>{payment.course}</span>
-                  </p>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FaDollarSign style={{ color: '#b30000', minWidth: '16px' }} />
-                    <span style={{ fontWeight: '600', minWidth: '80px' }}>Số tiền:</span>
-                    <span>{payment.amount} VNĐ</span>
-                  </p>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FaCalendar style={{ color: '#b30000', minWidth: '16px' }} />
-                    <span style={{ fontWeight: '600', minWidth: '80px' }}>Hạn nộp:</span>
-                    <span>{payment.dueDate}</span>
-                  </p>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FaInfoCircle style={{ color: '#b30000', minWidth: '16px' }} />
-                    <span style={{ fontWeight: '600', minWidth: '80px' }}>Trạng thái:</span>
-                    <span style={{
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      backgroundColor: payment.status === 'Đã thanh toán' ? '#d4edda' : '#fff3cd',
-                      color: payment.status === 'Đã thanh toán' ? '#155724' : '#856404',
-                      border: payment.status === 'Đã thanh toán' ? '1px solid #c3e6cb' : '1px solid #ffeaa7'
-                    }}>
-                  {payment.status}
-                </span>
-                  </p>
-                </div>
-              </div>
-              <div className="action-buttons" style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                gap: '1rem',
-                padding: '1rem',
-                borderTop: '1px solid #ffebee'
-              }}>
-                <button className="btn btn-secondary" style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #0066cc',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  transition: 'all 0.3s ease'
-                }} onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0066cc';
-                  e.currentTarget.style.color = 'white';
-                }} onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.color = '#0066cc';
-                }}>
-                  <FaCreditCard />
-                  <span>Thanh toán</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+  const handleConfirmPayment = async (e) => {
+    e.preventDefault();
+    console.log('Confirming payment for:', selectedPayment);
+    
+    if (!selectedPayment) {
+      alert('Không có thông tin thanh toán được chọn!');
+      return;
+    }
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginTop: '2rem'
-          }}>
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #b30000',
-                backgroundColor: currentPage === 1 ? '#f5f5f5' : 'white',
-                color: currentPage === 1 ? '#999' : '#b30000',
-                borderRadius: '5px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Trước
-            </button>
-            
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(pageNumber => (
-              <button
-                key={pageNumber}
-                onClick={() => handlePageChange(pageNumber)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid #b30000',
-                  backgroundColor: currentPage === pageNumber ? '#b30000' : 'white',
-                  color: currentPage === pageNumber ? 'white' : '#b30000',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {pageNumber}
-              </button>
-            ))}
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #b30000',
-                backgroundColor: currentPage === totalPages ? '#f5f5f5' : 'white',
-                color: currentPage === totalPages ? '#999' : '#b30000',
-                borderRadius: '5px',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Sau
-                  </button>
-                </div>
-        )}
-    </section>
-  );
+    setIsSubmittingPayment(true);
+
+    try {
+      // Sử dụng apiService để lấy token
+      const token = apiService.getToken() || user?.token;
+      console.log('Token sources:', {
+        apiServiceToken: apiService.getToken(),
+        userToken: user?.token
+      });
+      
+      if (!token) {
+        console.error('No token found');
+        alert('Vui lòng đăng nhập lại!');
+        return;
+      }
+
+      // Chuẩn bị dữ liệu cho API theo format multipart/form-data
+      const formData = new FormData();
+      formData.append('paymentId', selectedPayment._id);
+      formData.append('amount', (parseInt(paymentAmount) || selectedPayment.amount || selectedPayment.amountDue || selectedPayment.unpaidAmount).toString());
+
+      const amount = parseInt(paymentAmount) || selectedPayment.amount || selectedPayment.amountDue || selectedPayment.unpaidAmount;
+      
+      console.log('Sending payment request:', {
+        paymentId: selectedPayment._id,
+        amount: amount,
+        selectedPayment: selectedPayment
+      });
+      
+      const parentId = user?.roleId;
+      const requestUrl = `https://english-center-website.onrender.com/v1/api/parents/${parentId}/payment-request`;
+      
+      console.log('Request URL:', requestUrl);
+      console.log('Parent ID:', parentId);
+      console.log('Request method: POST with FormData');
+      console.log('FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
+      }
+
+      // Gọi API tạo yêu cầu thanh toán
+      const response = await fetch(requestUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Không set Content-Type, để browser tự động set cho FormData
+        },
+        body: formData,
+      });
+
+      console.log('API Response status:', response.status);
+      console.log('API Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Payment API error:', errorData);
+        console.error('Response status:', response.status);
+        console.error('Response statusText:', response.statusText);
+        throw new Error(`Lỗi API: ${response.status} - ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log('Payment API success:', result);
+
+      // Cập nhật trạng thái local sau khi API thành công
+      setUnpaidPayments(prev => {
+        const updated = prev.map(p => {
+          const match = (p._id && selectedPayment._id && p._id === selectedPayment._id)
+            || (p.id && selectedPayment.id && p.id === selectedPayment.id);
+          
+          if (match) {
+            console.log('Updating payment status for:', p);
+            return { ...p, status: 'Chờ xác thực' };
+          }
+          return p;
+        });
+        return updated;
+      });
+
+      alert('Đã gửi yêu cầu thanh toán thành công! Vui lòng chờ xác nhận từ admin.');
+      handleClosePaymentModal();
+
+    } catch (error) {
+      console.error('Payment confirmation error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      alert(`Lỗi khi gửi yêu cầu thanh toán: ${error.message || 'Lỗi không xác định'}`);
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return renderOverview();
+        return <ParentOverview stats={overviewStats} />;
       case 'children':
-        return renderChildren();
+        return <ChildrenList children={childrenList} currentPage={currentPage} itemsPerPage={itemsPerPage} onPageChange={handlePageChange} />;
       case 'payments':
-        return renderPayments();
+        return <PaymentHistory payments={unpaidPayments} currentPage={currentPage} itemsPerPage={itemsPerPage} onPageChange={handlePageChange} onOpenPaymentModal={handleOpenPaymentModal} />;
       default:
         return null;
     }
   };
 
   return (
-    <div className="parent-dashboard">
+    <div className="dashboard parent-dashboard">
       {renderHeader()}
       <div className="dashboard-content" style={{margin:0}}>
         {renderSidebar()}
-        <main className="parent-main-content">
+        <main className="main-content">
           {renderContent()}
         </main>
       </div>
+      <PaymentDetailModal
+        show={showPaymentModal}
+        onClose={handleClosePaymentModal}
+        payment={{ ...selectedPayment, qrImage }}
+        paymentAmount={paymentAmount}
+        onAmountChange={e => setPaymentAmount(e.target.value)}
+        onImageChange={handleVerificationImageChange}
+        verificationPreview={verificationPreview}
+        onSubmit={handleConfirmPayment}
+        isSubmitting={isSubmittingPayment}
+      />
+      {showPaymentModal && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <PaymentDetailModal
+              show={showPaymentModal}
+              onClose={handleClosePaymentModal}
+              payment={{ ...selectedPayment, qrImage }}
+              paymentAmount={paymentAmount}
+              onAmountChange={e => setPaymentAmount(e.target.value)}
+              onImageChange={handleVerificationImageChange}
+              verificationPreview={verificationPreview}
+              onSubmit={handleConfirmPayment}
+              isSubmitting={isSubmittingPayment}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <ProfileModal user={user} onClose={() => setShowProfileModal(false)} />
+      )}
+
+      {/* Notification Modal */}
+      <NotificationModal 
+        isOpen={showNotificationModal} 
+        onClose={() => setShowNotificationModal(false)} 
+        user={user}
+      />
     </div>
   );
 }
 
-export default ParentDashboard; 
+export default ParentDashboard;

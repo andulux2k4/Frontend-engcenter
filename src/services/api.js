@@ -3,6 +3,8 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'https://english-center-website
 
 // API Service Class
 class ApiService {
+  // getTeacherSchedule is not implemented because there is no backend endpoint.
+  // This method is intentionally removed to prevent accidental usage.
   constructor() {
     this.baseURL = BASE_URL;
   }
@@ -47,7 +49,7 @@ class ApiService {
           const errorData = await response.clone().json();
           console.log('❌ Error response body:', errorData);
           errorMessage += ` - ${errorData.message || errorData.msg || ''}`;
-        } catch (e) {
+        } catch {
           console.log('❌ Could not parse error response as JSON');
         }
         
@@ -128,7 +130,10 @@ class ApiService {
   }
 
   async updateProfile(token, profileData) {
-    return await this.apiCall('/v1/api/profile', {
+    console.log('🔄 updateProfile called with:', { token: token ? 'exists' : 'missing', profileData });
+    
+    // According to documentation, this endpoint uses form data
+    const result = await this.apiCall('/v1/api/profile', {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -136,6 +141,9 @@ class ApiService {
       },
       body: new URLSearchParams(profileData).toString(),
     });
+    
+    console.log('✅ updateProfile result:', result);
+    return result;
   }
 
   async changePassword(token, oldPassword, newPassword, confirmPassword) {
@@ -166,15 +174,15 @@ class ApiService {
     });
   }
 
-  async getUserById(token, userId, role = null) {
-    // Since the backend doesn't have GET /v1/api/users/:userId endpoint,
-    // return a structured response that the frontend can handle
-    return {
-      success: false,
-      message: 'API endpoint not found. Using summary data.',
-      error: 'ENDPOINT_NOT_FOUND'
-    };
-  }
+  // async getUserById(token, userId) {
+  //   // Since the backend doesn't have GET /v1/api/users/:userId endpoint,
+  //   // return a structured response that the frontend can handle
+  //   return {
+  //     success: false,
+  //     message: 'API endpoint not found. Using summary data.',
+  //     error: 'ENDPOINT_NOT_FOUND'
+  //   };
+  // }
 
   async toggleUserStatus(token, userId, isActive) {
     return await this.apiCall(`/v1/api/users/${userId}/status`, {
@@ -216,7 +224,7 @@ class ApiService {
     });
   }
 
-  async deleteUser(token, userId, role = null) {
+  async deleteUser(token, userId) {
     return await this.apiCall(`/v1/api/users/${userId}`, {
       method: 'DELETE',
       headers: {
@@ -439,23 +447,17 @@ class ApiService {
     });
   }
 
-  async getTeacherClasses(token) {
-    return await this.apiCall('/v1/api/teachers/classes', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+  /**
+   * Get classes for a specific teacher by filtering with teacherId (query param)
+   * Usage: apiService.getTeacherClasses(token, teacherId)
+   * Lưu ý: teacherId là tham số filter đúng, KHÔNG phải roleId
+   */
+  async getTeacherClasses(token, teacherId, page = 1, limit = 100) {
+    // Calls the generic getClasses with teacherId as filter (backend expects teacherId, not roleId)
+    return await this.getClasses(token, page, limit, { teacherId });
   }
 
-  async getTeacherSchedule(token) {
-    return await this.apiCall('/v1/api/teachers/schedule', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-  }
+
 
   // ==================== PARENT MANAGEMENT ====================
 
@@ -525,6 +527,15 @@ class ApiService {
 
   async getParentChildrenDetails(token, parentId) {
     return await this.apiCall(`/v1/api/parents/${parentId}/children-details`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  async getMyChildrenDetails(token) {
+    return await this.apiCall(`/v1/api/parents/my-children-details`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -934,6 +945,26 @@ class ApiService {
     });
   }
 
+  // Get notifications for current user's role
+  async getNotificationsForRole(token) {
+    return await this.apiCall('/v1/api/notifications/for-role', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  // Get notifications created by current user (for Admin/Teacher)
+  async getMyNotifications(token) {
+    return await this.apiCall('/v1/api/notifications/my-notifications', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
   async setupAutoNotification(token, autoNotificationData) {
     return await this.apiCall('/v1/api/notifications/auto-notifications', {
       method: 'POST',
@@ -949,23 +980,27 @@ class ApiService {
 
   async testConnection() {
     try {
+      const token = this.getToken();
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${this.baseURL}/v1/api/profile`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
       });
-      
       return {
         success: response.ok,
         status: response.status,
-        message: response.ok ? 'Connection successful' : 'Connection failed'
+        message: response.ok ? 'Connection successful' : 'Connection failed',
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        message: 'Connection failed'
+        message: 'Connection failed',
       };
     }
   }
