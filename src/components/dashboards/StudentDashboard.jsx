@@ -34,9 +34,12 @@ function StudentDashboard({ user, onLogout }) {
         const token = apiService.getToken && apiService.getToken();
         if (user && user.roleId) {
           const res = await apiService.getStudentById(token, user.roleId);
+          console.log('getStudentById response:', res);
           let courses = [];
           let stats = null;
           if (res && res.data) {
+            console.log('Student data:', res.data);
+            console.log('Attendance info:', res.data.attendanceInfo);
             // Courses
             if (res.data.classId) {
               const classArr = Array.isArray(res.data.classId) ? res.data.classId : [res.data.classId];
@@ -59,12 +62,49 @@ function StudentDashboard({ user, onLogout }) {
             }
             // Stats
             if (res.data.attendanceInfo) {
+              console.log('Processing attendance info:', res.data.attendanceInfo);
               stats = {
                 totalCourses: Array.isArray(res.data.classId) ? res.data.classId.length : (res.data.classId ? 1 : 0),
                 attendanceRate: res.data.attendanceInfo.attendanceRate ?? 0,
                 attendedLessons: res.data.attendanceInfo.attendedLessons ?? 0,
                 absentLessons: res.data.attendanceInfo.absentLessons ?? 0,
               };
+              console.log('Final stats:', stats);
+            } else {
+              console.log('No attendance info found in response');
+              console.log('Full response data:', res.data);
+              // Tính toán từ dữ liệu thô nếu có
+              let totalClasses = 0;
+              let attendedCount = 0;
+              let absentCount = 0;
+              
+              if (res.data.classId && Array.isArray(res.data.classId)) {
+                res.data.classId.forEach(cls => {
+                  if (cls.attendance && Array.isArray(cls.attendance)) {
+                    cls.attendance.forEach(att => {
+                      if (att.students && Array.isArray(att.students)) {
+                        const studentAttendance = att.students.find(s => s.studentId === res.data._id);
+                        if (studentAttendance) {
+                          totalClasses++;
+                          if (studentAttendance.isAbsent) {
+                            absentCount++;
+                          } else {
+                            attendedCount++;
+                          }
+                        }
+                      }
+                    });
+                  }
+                });
+              }
+              
+              stats = {
+                totalCourses: Array.isArray(res.data.classId) ? res.data.classId.length : (res.data.classId ? 1 : 0),
+                attendanceRate: totalClasses > 0 ? Math.round((attendedCount / totalClasses) * 100) : 0,
+                attendedLessons: attendedCount,
+                absentLessons: absentCount,
+              };
+              console.log('Calculated stats from raw data:', stats);
             }
           }
           setApiCourses(courses);

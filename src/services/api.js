@@ -1,5 +1,6 @@
-// API Configuration  
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://english-center-website.onrender.com';
+// API Configuration
+const BASE_URL =
+  import.meta.env.VITE_API_URL || "https://english-center-website.onrender.com";
 
 // API Service Class
 class ApiService {
@@ -11,13 +12,21 @@ class ApiService {
 
   // Generic API call method
   async apiCall(endpoint, options = {}) {
+    // Kiểm tra token trước khi gọi API nếu có Authorization header
+    if (options.headers && options.headers.Authorization) {
+      const token = options.headers.Authorization.replace("Bearer ", "");
+      if (token && !this.isTokenValid()) {
+        throw new Error("Token expired or invalid");
+      }
+    }
+
     const url = `${this.baseURL}${endpoint}`;
-    
-    console.log(`🌐 API Call: ${options.method || 'GET'} ${url}`);
-    
+
+    console.log(`🌐 API Call: ${options.method || "GET"} ${url}`);
+
     const defaultOptions = {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     };
 
@@ -34,33 +43,47 @@ class ApiService {
     // Log headers (without sensitive info)
     const logHeaders = { ...config.headers };
     if (logHeaders.Authorization) {
-      logHeaders.Authorization = logHeaders.Authorization.substring(0, 20) + '...';
+      logHeaders.Authorization =
+        logHeaders.Authorization.substring(0, 20) + "...";
     }
-    console.log('📤 Request headers:', logHeaders);
+    console.log("📤 Request headers:", logHeaders);
 
     try {
       const response = await fetch(url, config);
-      
-      console.log(`📥 Response status: ${response.status} ${response.statusText}`);
-      
+
+      console.log(
+        `📥 Response status: ${response.status} ${response.statusText}`
+      );
+
       if (!response.ok) {
+        // Xử lý token expired (401 Unauthorized)
+        if (response.status === 401) {
+          console.log("🔐 401 Unauthorized - Token may be expired");
+          this.removeToken();
+          localStorage.removeItem("userData");
+          // Redirect to login page
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+        }
+
         let errorMessage = `HTTP error! status: ${response.status}`;
         try {
           const errorData = await response.clone().json();
-          console.log('❌ Error response body:', errorData);
-          errorMessage += ` - ${errorData.message || errorData.msg || ''}`;
+          console.log("❌ Error response body:", errorData);
+          errorMessage += ` - ${errorData.message || errorData.msg || ""}`;
         } catch {
-          console.log('❌ Could not parse error response as JSON');
+          console.log("❌ Could not parse error response as JSON");
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       const result = await response.json();
-      console.log('✅ API call successful:', result);
+      console.log("✅ API call successful:", result);
       return result;
     } catch (error) {
-      console.error('❌ API call failed:', error);
+      console.error("❌ API call failed:", error);
       throw error;
     }
   }
@@ -68,10 +91,10 @@ class ApiService {
   // ==================== AUTHENTICATION ====================
 
   async login(email, password) {
-    const response = await this.apiCall('/v1/api/login', {
-      method: 'POST',
+    const response = await this.apiCall("/v1/api/login", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ email, password }).toString(),
     });
@@ -80,80 +103,92 @@ class ApiService {
   }
 
   async logout(token) {
-    return await this.apiCall('/v1/api/logout', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/logout", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async forgotPassword(email) {
-    return await this.apiCall('/v1/api/forgot-password', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/forgot-password", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ email }).toString(),
     });
   }
 
   async verifyResetCode(email, code) {
-    return await this.apiCall('/v1/api/verify-reset-code', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/verify-reset-code", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ email, code }).toString(),
     });
   }
 
   async resetPassword(email, code, newPassword, confirmPassword) {
-    return await this.apiCall('/v1/api/reset-password', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/reset-password", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ email, code, newPassword, confirmPassword }).toString(),
+      body: new URLSearchParams({
+        email,
+        code,
+        newPassword,
+        confirmPassword,
+      }).toString(),
     });
   }
 
   // ==================== PROFILE MANAGEMENT ====================
 
   async getProfile(token) {
-    return await this.apiCall('/v1/api/profile', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    return await this.apiCall("/v1/api/profile", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
   }
 
   async updateProfile(token, profileData) {
-    console.log('🔄 updateProfile called with:', { token: token ? 'exists' : 'missing', profileData });
-    
+    console.log("🔄 updateProfile called with:", {
+      token: token ? "exists" : "missing",
+      profileData,
+    });
+
     // According to documentation, this endpoint uses form data
-    const result = await this.apiCall('/v1/api/profile', {
-      method: 'PATCH',
+    const result = await this.apiCall("/v1/api/profile", {
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(profileData).toString(),
     });
-    
-    console.log('✅ updateProfile result:', result);
+
+    console.log("✅ updateProfile result:", result);
     return result;
   }
 
   async changePassword(token, oldPassword, newPassword, confirmPassword) {
-    return await this.apiCall('/v1/api/change-password', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/change-password", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ oldPassword, newPassword, confirmPassword }).toString(),
+      body: new URLSearchParams({
+        oldPassword,
+        newPassword,
+        confirmPassword,
+      }).toString(),
     });
   }
 
@@ -163,13 +198,13 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/users/?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -186,39 +221,39 @@ class ApiService {
 
   async toggleUserStatus(token, userId, isActive) {
     return await this.apiCall(`/v1/api/users/${userId}/status`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ isActive: isActive.toString() }).toString(),
     });
   }
 
   async createUser(token, userData) {
-    return await this.apiCall('/v1/api/users', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/users", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(userData),
     });
   }
 
   async updateUser(token, userId, updateData, role = null) {
-    role = (role || '').toLowerCase();
-    let endpoint = '';
-    if (role === 'teacher') endpoint = `/v1/api/teachers/${userId}`;
-    else if (role === 'parent') endpoint = `/v1/api/parents/${userId}`;
-    else if (role === 'student') endpoint = `/v1/api/students/${userId}`;
+    role = (role || "").toLowerCase();
+    let endpoint = "";
+    if (role === "teacher") endpoint = `/v1/api/teachers/${userId}`;
+    else if (role === "parent") endpoint = `/v1/api/parents/${userId}`;
+    else if (role === "student") endpoint = `/v1/api/students/${userId}`;
     else endpoint = `/v1/api/users/${userId}`;
-    
+
     return await this.apiCall(endpoint, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(updateData),
     });
@@ -226,9 +261,9 @@ class ApiService {
 
   async deleteUser(token, userId) {
     return await this.apiCall(`/v1/api/users/${userId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -236,20 +271,20 @@ class ApiService {
   // ==================== CLASS MANAGEMENT ====================
 
   async getClassesOverview(token) {
-    return await this.apiCall('/v1/api/classes/overview', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    return await this.apiCall("/v1/api/classes/overview", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
   }
 
   async createClass(token, classData) {
-    return await this.apiCall('/v1/api/classes', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/classes", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(classData),
     });
@@ -257,45 +292,48 @@ class ApiService {
 
   async getClasses(token, page = 1, limit = 10, filters = {}) {
     const queryParams = new URLSearchParams({
-      summary: 'true',
+      summary: "true",
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/classes?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getClassById(token, classId) {
-    return await this.apiCall(`/v1/api/classes/${classId}?include=attendance,detailed,students,schedule`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    return await this.apiCall(
+      `/v1/api/classes/${classId}?include=attendance,detailed,students,schedule`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
   }
 
   async updateClass(token, classId, updateData) {
     return await this.apiCall(`/v1/api/classes/${classId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updateData),
+    });
   }
 
   async deleteClass(token, classId) {
     return await this.apiCall(`/v1/api/classes/${classId}?hardDelete=false`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -303,14 +341,16 @@ class ApiService {
   async getAvailableTeachers(token, excludeClassId = null) {
     const queryParams = new URLSearchParams();
     if (excludeClassId) {
-      queryParams.append('excludeClassId', excludeClassId);
+      queryParams.append("excludeClassId", excludeClassId);
     }
 
-    const endpoint = `/v1/api/classes/available-teachers${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const endpoint = `/v1/api/classes/available-teachers${
+      queryParams.toString() ? `?${queryParams}` : ""
+    }`;
     return await this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -318,14 +358,16 @@ class ApiService {
   async getAvailableStudents(token, excludeClassId = null) {
     const queryParams = new URLSearchParams();
     if (excludeClassId) {
-      queryParams.append('excludeClassId', excludeClassId);
+      queryParams.append("excludeClassId", excludeClassId);
     }
 
-    const endpoint = `/v1/api/classes/available-students${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const endpoint = `/v1/api/classes/available-students${
+      queryParams.toString() ? `?${queryParams}` : ""
+    }`;
     return await this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -334,39 +376,46 @@ class ApiService {
 
   async createAttendanceSession(token, classId, attendanceData) {
     return await this.apiCall(`/v1/api/attendance/class/${classId}`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(attendanceData).toString(),
     });
   }
 
-  async getClassAttendance(token, classId, page = 1, limit = 10, startDate = null, endDate = null) {
+  async getClassAttendance(
+    token,
+    classId,
+    page = 1,
+    limit = 10,
+    startDate = null,
+    endDate = null
+  ) {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
-    if (startDate) queryParams.append('startDate', startDate);
-    if (endDate) queryParams.append('endDate', endDate);
+    if (startDate) queryParams.append("startDate", startDate);
+    if (endDate) queryParams.append("endDate", endDate);
 
     const endpoint = `/v1/api/attendance/class/${classId}?${queryParams}`;
-    
+
     return await this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async markAttendance(token, attendanceId, attendanceData) {
     return await this.apiCall(`/v1/api/attendance/${attendanceId}/mark`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(attendanceData),
     });
@@ -374,21 +423,21 @@ class ApiService {
 
   async deleteAttendanceSession(token, attendanceId) {
     return await this.apiCall(`/v1/api/attendance/${attendanceId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
   }
 
   // ==================== TEACHER MANAGEMENT ====================
 
   async createTeacher(token, teacherData) {
-    return await this.apiCall('/v1/api/teachers/', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/teachers/", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(teacherData),
     });
@@ -396,19 +445,19 @@ class ApiService {
 
   async getTeacherById(token, teacherId) {
     return await this.apiCall(`/v1/api/teachers/${teacherId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async updateTeacher(token, teacherId, updateData) {
     return await this.apiCall(`/v1/api/teachers/${teacherId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(updateData),
     });
@@ -418,31 +467,31 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/teachers?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async softDeleteTeacher(token, teacherId) {
     return await this.apiCall(`/v1/api/teachers/${teacherId}/soft`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async hardDeleteTeacher(token, teacherId) {
     return await this.apiCall(`/v1/api/teachers/${teacherId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -457,16 +506,14 @@ class ApiService {
     return await this.getClasses(token, page, limit, { teacherId });
   }
 
-
-
   // ==================== PARENT MANAGEMENT ====================
 
   async createParent(token, parentData) {
-    return await this.apiCall('/v1/api/parents', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/parents", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(parentData),
     });
@@ -476,32 +523,32 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/parents?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getParentById(token, parentId) {
     return await this.apiCall(`/v1/api/parents/${parentId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async updateParent(token, parentId, updateData) {
     return await this.apiCall(`/v1/api/parents/${parentId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(updateData),
     });
@@ -509,46 +556,46 @@ class ApiService {
 
   async softDeleteParent(token, parentId) {
     return await this.apiCall(`/v1/api/parents/${parentId}/soft`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async hardDeleteParent(token, parentId) {
     return await this.apiCall(`/v1/api/parents/${parentId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getParentChildrenDetails(token, parentId) {
     return await this.apiCall(`/v1/api/parents/${parentId}/children-details`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getMyChildrenDetails(token) {
     return await this.apiCall(`/v1/api/parents/my-children-details`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async updateParentChildren(token, parentId, action, studentIds) {
     return await this.apiCall(`/v1/api/parents/${parentId}/children`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ action, studentIds }),
     });
@@ -557,11 +604,11 @@ class ApiService {
   // ==================== STUDENT MANAGEMENT ====================
 
   async createStudent(token, studentData) {
-    return await this.apiCall('/v1/api/students', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/students", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(studentData),
     });
@@ -571,32 +618,32 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/students?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getStudentById(token, studentId) {
     return await this.apiCall(`/v1/api/students/${studentId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async updateStudent(token, studentId, updateData) {
     return await this.apiCall(`/v1/api/students/${studentId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(updateData),
     });
@@ -604,42 +651,49 @@ class ApiService {
 
   async softDeleteStudent(token, studentId) {
     return await this.apiCall(`/v1/api/students/${studentId}/soft`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async hardDeleteStudent(token, studentId) {
     return await this.apiCall(`/v1/api/students/${studentId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
-  async getStudentAvailableClasses(token, studentId, grade = null, year = null) {
+  async getStudentAvailableClasses(
+    token,
+    studentId,
+    grade = null,
+    year = null
+  ) {
     const queryParams = new URLSearchParams();
-    if (grade) queryParams.append('grade', grade);
-    if (year) queryParams.append('year', year);
+    if (grade) queryParams.append("grade", grade);
+    if (year) queryParams.append("year", year);
 
-    const endpoint = `/v1/api/students/${studentId}/available-classes${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const endpoint = `/v1/api/students/${studentId}/available-classes${
+      queryParams.toString() ? `?${queryParams}` : ""
+    }`;
     return await this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async enrollStudent(token, studentId, enrollmentData) {
     return await this.apiCall(`/v1/api/students/${studentId}/enroll`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(enrollmentData),
     });
@@ -647,10 +701,10 @@ class ApiService {
 
   async withdrawStudent(token, studentId, withdrawData) {
     return await this.apiCall(`/v1/api/students/${studentId}/withdraw`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(withdrawData),
     });
@@ -660,30 +714,32 @@ class ApiService {
 
   async getUnpaidPayments(token, parentId, month = null, year = null) {
     const queryParams = new URLSearchParams();
-    if (month) queryParams.append('month', month);
-    if (year) queryParams.append('year', year);
+    if (month) queryParams.append("month", month);
+    if (year) queryParams.append("year", year);
 
-    const endpoint = `/v1/api/parents/${parentId}/unpaid-payments${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const endpoint = `/v1/api/parents/${parentId}/unpaid-payments${
+      queryParams.toString() ? `?${queryParams}` : ""
+    }`;
     return await this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async createPaymentRequest(token, parentId, paymentData) {
     const formData = new FormData();
-    formData.append('paymentId', paymentData.paymentId);
-    formData.append('amount', paymentData.amount);
+    formData.append("paymentId", paymentData.paymentId);
+    formData.append("amount", paymentData.amount);
     if (paymentData.proof) {
-      formData.append('proof', paymentData.proof);
+      formData.append("proof", paymentData.proof);
     }
 
     return await this.apiCall(`/v1/api/parents/${parentId}/payment-request`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: formData,
     });
@@ -695,32 +751,38 @@ class ApiService {
       limit: limit.toString(),
     });
 
-    return await this.apiCall(`/v1/api/parent-payment-requests?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    return await this.apiCall(
+      `/v1/api/parent-payment-requests?${queryParams}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
   }
 
   async getPaymentRequestById(token, requestId) {
     return await this.apiCall(`/v1/api/parent-payment-requests/${requestId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async processPaymentRequest(token, requestId, action) {
-    return await this.apiCall(`/v1/api/parent-payment-requests/${requestId}/process`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ action }).toString(),
-    });
+    return await this.apiCall(
+      `/v1/api/parent-payment-requests/${requestId}/process`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ action }).toString(),
+      }
+    );
   }
 
   // ==================== TEACHER WAGE MANAGEMENT ====================
@@ -729,69 +791,86 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/teacher-wages?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async calculateTeacherWages(token, month, year) {
-    return await this.apiCall('/v1/api/teacher-wages/calculate', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/teacher-wages/calculate", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ month: month.toString(), year: year.toString() }).toString(),
+      body: new URLSearchParams({
+        month: month.toString(),
+        year: year.toString(),
+      }).toString(),
     });
   }
 
   async getTeacherWageById(token, teacherWageId) {
     return await this.apiCall(`/v1/api/teacher-wages/${teacherWageId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
-  async getTeacherWagesByTeacher(token, teacherId, page = 1, limit = 10, filters = {}) {
+  async getTeacherWagesByTeacher(
+    token,
+    teacherId,
+    page = 1,
+    limit = 10,
+    filters = {}
+  ) {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
-    return await this.apiCall(`/v1/api/teacher-wages/teacher/${teacherId}?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    return await this.apiCall(
+      `/v1/api/teacher-wages/teacher/${teacherId}?${queryParams}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
   }
 
   async processTeacherWagePayment(token, teacherWageId, paidAmount) {
-    return await this.apiCall(`/v1/api/teacher-wages/${teacherWageId}/process`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ paidAmount: paidAmount.toString() }).toString(),
-    });
+    return await this.apiCall(
+      `/v1/api/teacher-wages/${teacherWageId}/process`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          paidAmount: paidAmount.toString(),
+        }).toString(),
+      }
+    );
   }
 
   async updateTeacherWage(token, teacherWageId, updateData) {
     return await this.apiCall(`/v1/api/teacher-wages/${teacherWageId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(updateData).toString(),
     });
@@ -799,9 +878,9 @@ class ApiService {
 
   async deleteTeacherWage(token, teacherWageId) {
     return await this.apiCall(`/v1/api/teacher-wages/${teacherWageId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -810,12 +889,14 @@ class ApiService {
 
   async getStatistics(token, filters = {}) {
     const queryParams = new URLSearchParams(filters);
-    const endpoint = `/v1/api/statistics${queryParams.toString() ? `?${queryParams}` : ''}`;
-    
+    const endpoint = `/v1/api/statistics${
+      queryParams.toString() ? `?${queryParams}` : ""
+    }`;
+
     return await this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -823,27 +904,27 @@ class ApiService {
   // ==================== ADVERTISEMENTS ====================
 
   async getPublicAdvertisements() {
-    return await this.apiCall('/v1/api/advertisements/public', {
-      method: 'GET',
+    return await this.apiCall("/v1/api/advertisements/public", {
+      method: "GET",
     });
   }
 
   async createAdvertisement(token, advertisementData) {
     const formData = new FormData();
-    formData.append('title', advertisementData.title);
-    formData.append('content', advertisementData.content);
-    formData.append('startDate', advertisementData.startDate);
-    formData.append('endDate', advertisementData.endDate);
+    formData.append("title", advertisementData.title);
+    formData.append("content", advertisementData.content);
+    formData.append("startDate", advertisementData.startDate);
+    formData.append("endDate", advertisementData.endDate);
     if (advertisementData.images) {
-      advertisementData.images.forEach(image => {
-        formData.append('images', image);
+      advertisementData.images.forEach((image) => {
+        formData.append("images", image);
       });
     }
 
-    return await this.apiCall('/v1/api/advertisements', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/advertisements", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: formData,
     });
@@ -853,38 +934,38 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/advertisements?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getAdvertisementById(token, advertisementId) {
     return await this.apiCall(`/v1/api/advertisements/${advertisementId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async updateAdvertisement(token, advertisementId, updateData) {
     const formData = new FormData();
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined && updateData[key] !== '') {
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] !== undefined && updateData[key] !== "") {
         formData.append(key, updateData[key]);
       }
     });
 
     return await this.apiCall(`/v1/api/advertisements/${advertisementId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: formData,
     });
@@ -892,9 +973,9 @@ class ApiService {
 
   async deleteAdvertisement(token, advertisementId) {
     return await this.apiCall(`/v1/api/advertisements/${advertisementId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
@@ -902,11 +983,11 @@ class ApiService {
   // ==================== NOTIFICATIONS ====================
 
   async createNotification(token, notificationData) {
-    return await this.apiCall('/v1/api/notifications', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/notifications", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(notificationData),
     });
@@ -916,61 +997,61 @@ class ApiService {
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...filters
+      ...filters,
     });
 
     return await this.apiCall(`/v1/api/notifications?${queryParams}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async getNotificationById(token, notificationId) {
     return await this.apiCall(`/v1/api/notifications/${notificationId}`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async deleteNotification(token, notificationId) {
     return await this.apiCall(`/v1/api/notifications/${notificationId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   // Get notifications for current user's role
   async getNotificationsForRole(token) {
-    return await this.apiCall('/v1/api/notifications/for-role', {
-      method: 'GET',
+    return await this.apiCall("/v1/api/notifications/for-role", {
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   // Get notifications created by current user (for Admin/Teacher)
   async getMyNotifications(token) {
-    return await this.apiCall('/v1/api/notifications/my-notifications', {
-      method: 'GET',
+    return await this.apiCall("/v1/api/notifications/my-notifications", {
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
   }
 
   async setupAutoNotification(token, autoNotificationData) {
-    return await this.apiCall('/v1/api/notifications/auto-notifications', {
-      method: 'POST',
+    return await this.apiCall("/v1/api/notifications/auto-notifications", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(autoNotificationData).toString(),
     });
@@ -982,64 +1063,76 @@ class ApiService {
     try {
       const token = this.getToken();
       const headers = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        headers["Authorization"] = `Bearer ${token}`;
       }
       const response = await fetch(`${this.baseURL}/v1/api/profile`, {
-        method: 'GET',
+        method: "GET",
         headers,
       });
       return {
         success: response.ok,
         status: response.status,
-        message: response.ok ? 'Connection successful' : 'Connection failed',
+        message: response.ok ? "Connection successful" : "Connection failed",
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        message: 'Connection failed',
+        message: "Connection failed",
       };
     }
   }
 
   // Token management
   setToken(token) {
-    localStorage.setItem('authToken', token);
+    localStorage.setItem("authToken", token);
   }
 
   getToken() {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem("authToken");
   }
 
   removeToken() {
-    localStorage.removeItem('authToken');
+    localStorage.removeItem("authToken");
   }
 
   isTokenValid() {
     const token = this.getToken();
-    if (!token) return false;
-    
+    if (!token) {
+      console.log("🔐 No token found");
+      return false;
+    }
+
     try {
       // Basic JWT validation - check if token exists and has 3 parts
-      const parts = token.split('.');
-      if (parts.length !== 3) return false;
-      
-      // Decode payload to check expiration
-      const payload = JSON.parse(atob(parts[1]));
-      const currentTime = Date.now() / 1000;
-      
-      // Check if token is expired (if exp field exists)
-      if (payload.exp && payload.exp < currentTime) {
+      const parts = token.split(".");
+      if (parts.length !== 3) {
+        console.log("🔐 Token format invalid");
         this.removeToken();
         return false;
       }
-      
+
+      // Decode payload to check expiration
+      const payload = JSON.parse(atob(parts[1]));
+      const currentTime = Date.now() / 1000;
+
+      console.log("🔐 Token payload:", payload);
+      console.log("🔐 Current time:", currentTime);
+
+      // Check if token is expired (if exp field exists)
+      if (payload.exp && payload.exp < currentTime) {
+        console.log("🔐 Token expired");
+        this.removeToken();
+        return false;
+      }
+
+      console.log("🔐 Token is valid");
       return true;
     } catch (error) {
-      console.error('Token validation error:', error);
+      console.error("🔐 Token validation error:", error);
       this.removeToken();
       return false;
     }
@@ -1047,18 +1140,18 @@ class ApiService {
 
   async ensureAuthentication() {
     if (!this.isTokenValid()) {
-      throw new Error('Authentication required');
+      throw new Error("Authentication required");
     }
-    
+
     const token = this.getToken();
     if (!token) {
-      throw new Error('No token available');
+      throw new Error("No token available");
     }
-    
+
     return token;
   }
 }
 
 // Create and export a singleton instance
 const apiService = new ApiService();
-export default apiService; 
+export default apiService;

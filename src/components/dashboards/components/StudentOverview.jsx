@@ -65,7 +65,9 @@ function StudentOverview({ stats }) {
             </h3>
             <p className="stat" style={{ fontSize: '1.8rem', fontWeight: '700', color: '#b30000', margin: '1rem 0', textAlign: 'center' }}>
               <FaUserCheck />
-              {stats?.attendanceRate ?? "0%"}
+              {stats?.attendanceRate !== undefined && stats?.attendanceRate !== null 
+                ? (typeof stats.attendanceRate === 'string' ? stats.attendanceRate : `${stats.attendanceRate}%`)
+                : "Chưa có dữ liệu"}
             </p>
             <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', margin: '0' }}>Tỷ lệ tham gia đầy đủ buổi học</p>
           </div>
@@ -88,7 +90,9 @@ function StudentOverview({ stats }) {
             </h3>
             <p className="stat" style={{ fontSize: '1.8rem', fontWeight: '700', color: '#b30000', margin: '1rem 0', textAlign: 'center' }}>
               <FaUserCheck />
-              {stats?.attendedLessons ?? 0}
+              {stats?.attendedLessons !== undefined && stats?.attendedLessons !== null 
+                ? stats.attendedLessons 
+                : "Chưa có dữ liệu"}
             </p>
             <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', margin: '0' }}>Số ngày tham gia</p>
           </div>
@@ -111,7 +115,9 @@ function StudentOverview({ stats }) {
             </h3>
             <p className="stat" style={{ fontSize: '1.8rem', fontWeight: '700', color: '#b30000', margin: '1rem 0', textAlign: 'center' }}>
               <FaCalendarDay />
-              {stats?.absentLessons ?? 0}
+              {stats?.absentLessons !== undefined && stats?.absentLessons !== null 
+                ? stats.absentLessons 
+                : "Chưa có dữ liệu"}
             </p>
             <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', margin: '0' }}>Số ngày không tham gia</p>
           </div>
